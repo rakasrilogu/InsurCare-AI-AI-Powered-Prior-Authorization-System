@@ -1,0 +1,53 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: insurcare
+      POSTGRES_PASSWORD: insurcare
+      POSTGRES_DB: insurcare
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U insurcare"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://insurcare:insurcare@db:5432/insurcare
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me-to-a-long-random-string}
+      JWT_EXPIRE_MINUTES: 1440
+      CORS_ORIGINS: http://localhost:5173,http://localhost:8080,http://localhost:3000
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      CHROMA_PERSIST_DIR: /app/chroma_data
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - chroma_data:/app/chroma_data
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL:-}   # empty → nginx proxies /api/ to backend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+  chroma_data:

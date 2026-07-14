@@ -1,0 +1,11 @@
+# Production override — removes development volume mounts
+services:
+  backend:
+    volumes:
+      - chroma_data:/app/chroma_data
+    # Remove ./backend:/app mount — code is baked into the image
+
+  frontend:
+    ports:
+      - "80:80"
+    # Remove 3000:80 override — use standard HTTP port
