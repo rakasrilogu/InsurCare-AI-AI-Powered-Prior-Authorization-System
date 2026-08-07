@@ -306,14 +306,12 @@ export default function ResultPage() {
                   </div>
                 </div>
 
-                {/* Policy Clauses — both roles see this (insurer label differs) */}
+                {/* Policy Clauses — insurer only (audit trail) */}
+                {isInsurer && (
                 <div className="bg-card rounded-2xl p-6 shadow-card">
                   <div className="flex items-center gap-2 mb-4">
                     <ShieldCheck className="w-5 h-5 text-secondary" />
                     <h3 className="font-bold text-foreground">Policy Clauses Cited</h3>
-                    {!isInsurer && (
-                      <span className="ml-auto text-[10px] font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-full">Reference</span>
-                    )}
                   </div>
                   {(req.policy_clauses_cited || []).length > 0 ? (
                     <div className="space-y-2">
@@ -329,6 +327,7 @@ export default function ResultPage() {
                     <p className="text-sm text-muted-foreground">No specific clauses cited.</p>
                   )}
                 </div>
+                )}
 
                 {/* Risk Assessment — both roles (insurer sees full breakdown, hospital sees summary) */}
                 <div className="bg-card rounded-2xl p-6 shadow-card">
