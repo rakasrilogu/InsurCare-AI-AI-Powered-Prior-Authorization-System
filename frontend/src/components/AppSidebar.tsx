@@ -19,6 +19,7 @@ const NAV: Record<string, { label: string; path: string; icon: any; pulse?: bool
   hospital_viewer: [
     { label: 'Dashboard',     path: '/dashboard',      icon: LayoutDashboard },
     { label: 'Patient Results',path: '/requests',       icon: List },
+    { label: 'Agent Tracking',path: '/agent-tracking',  icon: Activity },
     { label: 'Analytics',     path: '/analytics',       icon: BarChart3 },
     { label: 'AI Assistant',  path: '/chat',            icon: MessageSquare },
   ],

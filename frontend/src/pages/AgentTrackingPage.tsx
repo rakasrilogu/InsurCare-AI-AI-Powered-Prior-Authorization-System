@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { FileInput, ShieldCheck, BookOpen, AlertTriangle, Brain, MessageSquare, DollarSign, Loader2, RefreshCw } from 'lucide-react';
+import { FileInput, ShieldCheck, BookOpen, AlertTriangle, Brain, MessageSquare, DollarSign, Loader2, RefreshCw, Eye, EyeOff } from 'lucide-react';
 import DashboardLayout from '@/components/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 import PipelinePage from './PipelinePage';
 
 const AGENT_DEFS = [
@@ -20,6 +21,7 @@ const AGENT_DEFS = [
 
 export default function AgentTrackingPage() {
   const { id } = useParams<{ id?: string }>();
+  const { isInsurer } = useAuth();
 
   // When opened for a specific request (e.g. right after submit), show the
   // live agent panel that streams each agent's logs as it runs.
@@ -75,9 +77,23 @@ export default function AgentTrackingPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Agent Tracking</h1>
-            <p className="text-muted-foreground text-sm">Live performance stats for all 6 AI agents.</p>
+            <p className="text-muted-foreground text-sm">
+              {isInsurer
+                ? 'Detailed performance stats for all 6 AI agents. Full pipeline visibility.'
+                : 'Live agent pipeline status. Simplified view — submit a PA to see real-time progress.'}
+            </p>
           </div>
           <div className="flex gap-3 items-center">
+            {isInsurer && (
+              <span className="flex items-center gap-1.5 text-xs font-medium text-secondary bg-secondary/10 px-3 py-1.5 rounded-full">
+                <Eye className="w-3.5 h-3.5" /> Full Detail View
+              </span>
+            )}
+            {!isInsurer && (
+              <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground bg-muted px-3 py-1.5 rounded-full">
+                <EyeOff className="w-3.5 h-3.5" /> Summary View
+              </span>
+            )}
             <Button variant="outline" size="sm" onClick={load} disabled={loading}>
               <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} /> Refresh
             </Button>
@@ -104,7 +120,6 @@ export default function AgentTrackingPage() {
                         </div>
                         <div>
                           <p className="font-semibold text-foreground text-sm">{agent.name}</p>
-
                         </div>
                       </div>
                     </div>
@@ -134,15 +149,17 @@ export default function AgentTrackingPage() {
                           <div className="h-full bg-success rounded-full" style={{ width: `${successRate}%` }} />
                         </div>
                       </div>
-                      <div>
-                        <div className="flex justify-between mb-1 text-xs">
-                          <span className="text-muted-foreground">Avg Confidence</span>
-                          <span className="font-semibold text-foreground">{avgConf > 0 ? `${avgConf}%` : '—'}</span>
+                      {isInsurer && (
+                        <div>
+                          <div className="flex justify-between mb-1 text-xs">
+                            <span className="text-muted-foreground">Avg Confidence</span>
+                            <span className="font-semibold text-foreground">{avgConf > 0 ? `${avgConf}%` : '—'}</span>
+                          </div>
+                          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                            <div className="h-full bg-secondary rounded-full" style={{ width: `${avgConf}%` }} />
+                          </div>
                         </div>
-                        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                          <div className="h-full bg-secondary rounded-full" style={{ width: `${avgConf}%` }} />
-                        </div>
-                      </div>
+                      )}
                     </div>
 
                     <div className="mt-3 pt-3 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
@@ -164,7 +181,10 @@ export default function AgentTrackingPage() {
                   <table className="w-full">
                     <thead>
                       <tr className="border-b border-border">
-                        {['Request','Patient','Decision','Risk','Confidence','Status'].map(h => (
+                        {(isInsurer
+                          ? ['Request','Patient','Decision','Risk','Confidence','Status']
+                          : ['Request','Patient','Decision','Status']
+                        ).map(h => (
                           <th key={h} className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">{h}</th>
                         ))}
                       </tr>
@@ -175,8 +195,12 @@ export default function AgentTrackingPage() {
                           <td className="px-6 py-3 text-sm font-mono text-secondary">{req.request_code}</td>
                           <td className="px-6 py-3 text-sm text-foreground">{req.patient_name}</td>
                           <td className="px-6 py-3 text-sm font-medium capitalize text-foreground">{req.decision ?? '—'}</td>
-                          <td className="px-6 py-3 text-sm">{req.risk_score ? Math.round(req.risk_score) : '—'}</td>
-                          <td className="px-6 py-3 text-sm">{req.confidence_score ? `${Math.round(req.confidence_score * 100)}%` : '—'}</td>
+                          {isInsurer && (
+                            <>
+                              <td className="px-6 py-3 text-sm">{req.risk_score ? Math.round(req.risk_score) : '—'}</td>
+                              <td className="px-6 py-3 text-sm">{req.confidence_score ? `${Math.round(req.confidence_score * 100)}%` : '—'}</td>
+                            </>
+                          )}
                           <td className="px-6 py-3 capitalize text-sm text-muted-foreground">{req.status}</td>
                         </tr>
                       ))}

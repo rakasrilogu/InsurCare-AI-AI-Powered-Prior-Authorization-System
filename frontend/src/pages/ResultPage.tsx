@@ -149,6 +149,17 @@ export default function ResultPage() {
         <Link to="/requests" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="w-4 h-4" /> Back to All Requests
         </Link>
+        {!isProcessing && (
+          <div className="flex items-center gap-2">
+            <span className={`text-xs font-medium px-3 py-1 rounded-full ${
+              isInsurer
+                ? 'bg-purple-500/10 text-purple-600 border border-purple-500/20'
+                : 'bg-blue-500/10 text-blue-600 border border-blue-500/20'
+            }`}>
+              {isInsurer ? 'Insurer View — Full Detail' : 'Hospital View — Summary'}
+            </span>
+          </div>
+        )}
 
         {/* ── Processing State ── */}
         {isProcessing && (
@@ -254,7 +265,29 @@ export default function ResultPage() {
 
               <div className="grid md:grid-cols-2 gap-5">
 
-                {/* WHY APPROVED / WHY DENIED */}
+                {/* Patient & Procedure Summary — both roles */}
+                <div className="bg-card rounded-2xl p-6 shadow-card">
+                  <div className="flex items-center gap-2 mb-4">
+                    <FileText className="w-5 h-5 text-secondary" />
+                    <h3 className="font-bold text-foreground">Patient & Procedure</h3>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div><p className="text-muted-foreground">Patient</p><p className="font-medium text-foreground">{req.patient_name}</p></div>
+                    <div><p className="text-muted-foreground">Age / Gender</p><p className="font-medium text-foreground">{req.patient_age} · {req.patient_gender}</p></div>
+                    <div><p className="text-muted-foreground">Procedure</p><p className="font-medium text-foreground">{req.procedure_name}</p></div>
+                    <div><p className="text-muted-foreground">CPT Code</p><p className="font-mono font-medium text-foreground">{req.procedure_code}</p></div>
+                    <div><p className="text-muted-foreground">Diagnosis</p><p className="font-medium text-foreground">{req.diagnosis || '—'}</p></div>
+                    <div><p className="text-muted-foreground">Policy</p><p className="font-medium text-foreground">{req.policy_number}</p></div>
+                  </div>
+                  {req.clinical_justification && (
+                    <div className="mt-4 pt-3 border-t border-border">
+                      <p className="text-xs font-semibold text-muted-foreground mb-1">Clinical Justification</p>
+                      <p className="text-sm text-foreground leading-relaxed">{req.clinical_justification}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* WHY APPROVED / WHY DENIED — both roles */}
                 <div className="bg-card rounded-2xl p-6 shadow-card">
                   <div className="flex items-center gap-2 mb-4">
                     {isApproved ? <CheckCircle2 className="w-5 h-5 text-success" /> : <XCircle className="w-5 h-5 text-destructive" />}
@@ -273,11 +306,14 @@ export default function ResultPage() {
                   </div>
                 </div>
 
-                {/* Policy Clauses */}
+                {/* Policy Clauses — both roles see this (insurer label differs) */}
                 <div className="bg-card rounded-2xl p-6 shadow-card">
                   <div className="flex items-center gap-2 mb-4">
-                    <FileText className="w-5 h-5 text-secondary" />
+                    <ShieldCheck className="w-5 h-5 text-secondary" />
                     <h3 className="font-bold text-foreground">Policy Clauses Cited</h3>
+                    {!isInsurer && (
+                      <span className="ml-auto text-[10px] font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-full">Reference</span>
+                    )}
                   </div>
                   {(req.policy_clauses_cited || []).length > 0 ? (
                     <div className="space-y-2">
@@ -294,7 +330,7 @@ export default function ResultPage() {
                   )}
                 </div>
 
-                {/* Risk Breakdown */}
+                {/* Risk Assessment — both roles (insurer sees full breakdown, hospital sees summary) */}
                 <div className="bg-card rounded-2xl p-6 shadow-card">
                   <div className="flex items-center gap-2 mb-4">
                     <TrendingUp className="w-5 h-5 text-secondary" />
@@ -304,23 +340,40 @@ export default function ResultPage() {
                     <p className="text-xs text-muted-foreground mb-1">Overall Risk Score (0–100)</p>
                     <RiskBar score={req.risk_score || 0} />
                   </div>
-                  <div className="space-y-3">
-                    {[
-                      { label: 'Severity Score', value: riskDetails?.severity_score, weight: '40%' },
-                      { label: 'Delay Factor', value: riskDetails?.delay_factor_score, weight: '35%' },
-                      { label: 'Age Factor', value: riskDetails?.age_factor_score, weight: '25%' },
-                    ].map(({ label, value, weight }) => (
-                      <div key={label}>
-                        <div className="flex justify-between text-xs mb-1">
-                          <span className="text-muted-foreground">{label} <span className="opacity-60">({weight})</span></span>
-                          <span className="font-medium text-foreground">{value ?? '—'}</span>
+                  {/* Full breakdown — insurer only */}
+                  {isInsurer && (
+                    <div className="space-y-3">
+                      {[
+                        { label: 'Severity Score', value: riskDetails?.severity_score, weight: '40%' },
+                        { label: 'Delay Factor', value: riskDetails?.delay_factor_score, weight: '35%' },
+                        { label: 'Age Factor', value: riskDetails?.age_factor_score, weight: '25%' },
+                      ].map(({ label, value, weight }) => (
+                        <div key={label}>
+                          <div className="flex justify-between text-xs mb-1">
+                            <span className="text-muted-foreground">{label} <span className="opacity-60">({weight})</span></span>
+                            <span className="font-medium text-foreground">{value ?? '—'}</span>
+                          </div>
+                          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                            <div className="h-full bg-secondary rounded-full" style={{ width: `${value ?? 0}%` }} />
+                          </div>
                         </div>
-                        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                          <div className="h-full bg-secondary rounded-full" style={{ width: `${value ?? 0}%` }} />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
+                  {/* Risk level badge — hospital sees this */}
+                  {!isInsurer && riskDetails?.risk_level && (
+                    <div className="flex items-center gap-2 mt-3">
+                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+                        riskDetails.risk_level === 'low' ? 'bg-success/10 text-success' :
+                        riskDetails.risk_level === 'moderate' ? 'bg-warning/10 text-warning' :
+                        riskDetails.risk_level === 'high' ? 'bg-destructive/10 text-destructive' :
+                        'bg-orange-500/10 text-orange-500'
+                      }`}>
+                        {riskDetails.risk_level.toUpperCase()} RISK
+                      </span>
+                      <span className="text-xs text-muted-foreground">Based on severity, delay, and age factors</span>
+                    </div>
+                  )}
                   {riskDetails?.comorbidity_flags?.length > 0 && (
                     <div className="mt-4 pt-4 border-t border-border">
                       <p className="text-xs font-semibold text-muted-foreground mb-2">Comorbidity Flags</p>
@@ -333,34 +386,35 @@ export default function ResultPage() {
                   )}
                 </div>
 
-                {/* Next Steps */}
-                <div className="bg-card rounded-2xl p-6 shadow-card">
+                {/* Next Steps — both roles */}
+                <div className="bg-card rounded-2xl p-6 shadow-card md:col-span-2">
                   <div className="flex items-center gap-2 mb-4">
                     <ClipboardList className="w-5 h-5 text-secondary" />
                     <h3 className="font-bold text-foreground">Next Steps</h3>
                   </div>
-                  <div className="space-y-2 mb-5">
-                    {(req.next_steps || []).map((s: string, i: number) => (
-                      <motion.div key={i} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}
-                        className="flex items-start gap-2.5">
-                        <ArrowRight className="w-4 h-4 text-secondary shrink-0 mt-0.5" />
-                        <span className="text-sm text-foreground">{s}</span>
-                      </motion.div>
-                    ))}
-                    {(req.next_steps || []).length === 0 && (
-                      <p className="text-sm text-muted-foreground">No specific next steps.</p>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      {(req.next_steps || []).map((s: string, i: number) => (
+                        <motion.div key={i} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}
+                          className="flex items-start gap-2.5">
+                          <ArrowRight className="w-4 h-4 text-secondary shrink-0 mt-0.5" />
+                          <span className="text-sm text-foreground">{s}</span>
+                        </motion.div>
+                      ))}
+                      {(req.next_steps || []).length === 0 && (
+                        <p className="text-sm text-muted-foreground">No specific next steps.</p>
+                      )}
+                    </div>
+                    {req.doctor_recommendation && (
+                      <div className="bg-secondary/5 rounded-xl p-4 border border-secondary/10">
+                        <p className="text-xs font-semibold text-secondary uppercase tracking-wide mb-1">Doctor Recommendation</p>
+                        <p className="text-sm text-foreground">{req.doctor_recommendation}</p>
+                      </div>
                     )}
                   </div>
-
-                  {req.doctor_recommendation && (
-                    <div className="bg-secondary/5 rounded-xl p-4 border border-secondary/10">
-                      <p className="text-xs font-semibold text-secondary uppercase tracking-wide mb-1">Doctor Recommendation</p>
-                      <p className="text-sm text-foreground">{req.doctor_recommendation}</p>
-                    </div>
-                  )}
                 </div>
 
-                {/* Appeal Pathway — only if denied */}
+                {/* Appeal Pathway — both roles if denied */}
                 {(isDenied || isEscalated) && req.appeal_pathway && (
                   <div className="md:col-span-2 bg-warning/5 rounded-2xl p-6 border border-warning/20">
                     <div className="flex items-center gap-2 mb-3">
@@ -500,8 +554,8 @@ export default function ResultPage() {
 
               </div>
 
-              {/* Agent Timeline (collapsed) */}
-              {req.agent_runs?.length > 0 && (
+              {/* Agent Timeline — insurer only (full audit trail) */}
+              {isInsurer && req.agent_runs?.length > 0 && (
                 <div className="bg-card rounded-2xl p-6 shadow-card">
                   <div className="flex items-center gap-2 mb-4">
                     <Clock className="w-5 h-5 text-secondary" />
@@ -522,6 +576,28 @@ export default function ResultPage() {
                           </div>
                           {run.output && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{run.output}</p>}
                         </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Simplified Agent Pipeline — hospital only */}
+              {!isInsurer && req.agent_runs?.length > 0 && (
+                <div className="bg-card rounded-2xl p-6 shadow-card">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Clock className="w-5 h-5 text-secondary" />
+                    <h3 className="font-bold text-foreground">Agent Pipeline Status</h3>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {req.agent_runs.sort((a: any, b: any) => a.id - b.id).map((run: any) => (
+                      <div key={run.id} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${
+                        run.status==='completed'?'bg-success/10 text-success border border-success/20':
+                        run.status==='error'?'bg-destructive/10 text-destructive border border-destructive/20':
+                        'bg-muted text-muted-foreground border border-border'
+                      }`}>
+                        {run.status==='completed' ? '✓' : run.status==='error' ? '✗' : '…'}
+                        <span className="capitalize">{run.agent_id}</span>
                       </div>
                     ))}
                   </div>
