@@ -15,6 +15,7 @@ import AgentTrackingPage  from "./pages/AgentTrackingPage";
 import RequestsPage       from "./pages/RequestsPage";
 import AnalyticsPage      from "./pages/AnalyticsPage";
 import ChatPage           from "./pages/ChatPage";
+import AuditLogPage       from "./pages/AuditLogPage";
 import NotFound           from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -41,6 +42,7 @@ const App = () => (
             <Route path="/agent-tracking/:id"    element={<ProtectedRoute><AgentTrackingPage /></ProtectedRoute>} />
             <Route path="/analytics"     element={<ProtectedRoute><AnalyticsPage /></ProtectedRoute>} />
             <Route path="/chat"          element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
+            <Route path="/audit"         element={<ProtectedRoute><AuditLogPage /></ProtectedRoute>} />
             <Route path="*"              element={<NotFound />} />
           </Routes>
         </BrowserRouter>

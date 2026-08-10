@@ -24,8 +24,8 @@ import httpx
 from ..models.pa_request import PARequest
 from ..models.agent_run import AgentRun
 
-HAIKU  = "gemini-2.0-flash"
-SONNET = "gemini-2.0-flash"
+HAIKU  = "gemini-2.5-flash"
+SONNET = "gemini-2.5-flash"
 API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 
 from .policy_rag import retrieve_policy_clauses, build_grounded_context, extract_financial_facts

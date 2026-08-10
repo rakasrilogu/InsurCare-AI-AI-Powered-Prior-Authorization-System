@@ -123,6 +123,21 @@ export const AnalyticsWeeklyItemSchema = z.object({
 });
 export type AnalyticsWeeklyItem = z.infer<typeof AnalyticsWeeklyItemSchema>;
 
+export const AuditLogSchema = z.object({
+  id: z.number(),
+  user_id: z.number().nullable(),
+  user_email: z.string().nullable(),
+  user_role: z.string().nullable(),
+  action: z.string(),
+  resource_type: z.string(),
+  resource_id: z.number().nullable(),
+  detail: z.string().nullable(),
+  ip_address: z.string().nullable(),
+  created_at: z.string().nullable(),
+});
+
+export type AuditLog = z.infer<typeof AuditLogSchema>;
+
 // ── Validated request helper ───────────────────────────────────────────────────
 
 async function requestValidated<T>(
@@ -194,4 +209,13 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ reason }),
     }),
+
+  listAuditLogs: (params?: { action?: string; resource_type?: string; limit?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.action) qs.set("action", params.action);
+    if (params?.resource_type) qs.set("resource_type", params.resource_type);
+    if (params?.limit) qs.set("limit", String(params.limit));
+    const query = qs.toString();
+    return requestValidated(z.array(AuditLogSchema), `/api/audit${query ? "?" + query : ""}`);
+  },
 };

@@ -2,7 +2,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, FilePlus, List, Activity,
   BarChart3, MessageSquare, LogOut, Brain,
-  Building2, Shield,
+  Building2, Shield, ScrollText,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -15,6 +15,7 @@ const NAV: Record<string, { label: string; path: string; icon: any; pulse?: bool
     { label: 'Agent Tracking',path: '/agent-tracking',  icon: Activity },
     { label: 'Analytics',     path: '/analytics',       icon: BarChart3 },
     { label: 'AI Assistant',  path: '/chat',            icon: MessageSquare },
+    { label: 'Audit Log',     path: '/audit',           icon: ScrollText },
   ],
   hospital_viewer: [
     { label: 'Dashboard',     path: '/dashboard',      icon: LayoutDashboard },
@@ -22,6 +23,7 @@ const NAV: Record<string, { label: string; path: string; icon: any; pulse?: bool
     { label: 'Agent Tracking',path: '/agent-tracking',  icon: Activity },
     { label: 'Analytics',     path: '/analytics',       icon: BarChart3 },
     { label: 'AI Assistant',  path: '/chat',            icon: MessageSquare },
+    { label: 'Audit Log',     path: '/audit',           icon: ScrollText },
   ],
   insurer: [
     { label: 'Dashboard',     path: '/dashboard',      icon: LayoutDashboard },
@@ -29,6 +31,7 @@ const NAV: Record<string, { label: string; path: string; icon: any; pulse?: bool
     { label: 'Agent Tracking',path: '/agent-tracking',  icon: Activity },
     { label: 'Analytics',     path: '/analytics',       icon: BarChart3 },
     { label: 'AI Assistant',  path: '/chat',            icon: MessageSquare },
+    { label: 'Audit Log',     path: '/audit',           icon: ScrollText },
   ],
 };
 
