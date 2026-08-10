@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from ..database import get_db
 from ..models.user import User
 from ..models.audit_log import AuditLog
+from ..models.pa_request import PARequest
 from ..security import get_current_user
 from pydantic import BaseModel
 from typing import Optional
@@ -37,13 +38,23 @@ def list_audit_logs(
     user: User = Depends(get_current_user),
 ):
     if user.role not in ("insurer", "hospital"):
-        from fastapi import HTTPException
         raise HTTPException(403, "Only insurers and hospitals can view audit logs")
 
     q = db.query(AuditLog)
 
     if user.role == "hospital":
+        # Hospital users only see their own actions
         q = q.filter(AuditLog.user_id == user.id)
+
+    elif user.role == "insurer":
+        # Insurers only see logs for PA requests that match their company
+        my_request_ids = db.query(PARequest.id).filter(
+            PARequest.insurance_provider == user.company_name
+        ).subquery()
+        q = q.filter(
+            (AuditLog.resource_type == "pa_request") &
+            (AuditLog.resource_id.in_(db.query(my_request_ids)))
+        )
 
     if action:
         q = q.filter(AuditLog.action == action)
