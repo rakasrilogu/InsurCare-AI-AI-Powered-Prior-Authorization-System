@@ -192,6 +192,19 @@ Schema:
   "confidence": float
 }"""
 
+    # Build document verification context
+    doc_verification = ""
+    docs = req.documents or []
+    verified_docs = [d for d in docs if isinstance(d, dict) and d.get("verification")]
+    if verified_docs:
+        doc_lines = []
+        for d in verified_docs:
+            v = d["verification"]
+            status = v.get("status", "unknown")
+            issues = v.get("issues", [])
+            doc_lines.append(f"  - {d.get('filename','?')}: {status}" + (f" ({'; '.join(issues)})" if issues else ""))
+        doc_verification = "\nDocument verification results:\n" + "\n".join(doc_lines)
+
     prompt = f"""Validate this PA request:
 Patient Name: {req.patient_name}
 Patient ID: {req.patient_id}
@@ -203,7 +216,7 @@ Procedure: {req.procedure_name}
 CPT Code: {req.procedure_code}
 Diagnosis: {req.diagnosis or 'Not provided'}
 Clinical Justification: {req.clinical_justification}
-Documents uploaded: {len(req.documents or [])}"""
+Documents uploaded: {len(docs)}{doc_verification}"""
 
     _log_progress(db, req.id, "intake", "Validating PA request fields...")
     try:

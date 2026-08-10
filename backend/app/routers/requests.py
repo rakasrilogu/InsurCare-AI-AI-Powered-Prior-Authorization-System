@@ -12,6 +12,7 @@ from ..models.pa_request import PARequest
 from ..schemas.pa_request import PARequestCreate, PARequestOut
 from ..security import get_current_user
 from ..agents.orchestrator import run_pipeline
+from ..services.audit import log_action
 
 router = APIRouter(prefix="/api/requests", tags=["requests"])
 
@@ -98,6 +99,11 @@ def create_request(
     code = f"PA-{uuid.uuid4().hex[:8].upper()}"
     req = PARequest(request_code=code, user_id=user.id, **data.model_dump())
     db.add(req); db.commit(); db.refresh(req)
+
+    log_action(db, user_id=user.id, user_email=user.email, user_role=user.role,
+               action="create", resource_type="pa_request", resource_id=req.id,
+               detail=f"Created PA request {code} for {data.patient_name}")
+
     bg.add_task(_process_in_bg, req.id)
     return req
 
@@ -127,6 +133,9 @@ def list_requests(
             q = q.filter(PARequest.insurance_provider == user.company_name)
         else:
             q = q.filter(False)
+
+    else:
+        q = q.filter(False)
 
     return q.order_by(PARequest.created_at.desc()).limit(200).all()
 
@@ -158,6 +167,9 @@ def get_request(
     elif user.role == "insurer":
         if req.insurance_provider != user.company_name:
             raise HTTPException(403, "Access denied")
+
+    else:
+        raise HTTPException(403, "Access denied")
 
     return req
 
@@ -196,6 +208,11 @@ def approve_payment(
     req.paid_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(req)
+
+    log_action(db, user_id=user.id, user_email=user.email, user_role=user.role,
+               action="approve_payment", resource_type="pa_request", resource_id=req.id,
+               detail=f"Approved payment {tx_id} for Rs {req.approved_amount_inr}")
+
     return req
 
 
@@ -219,4 +236,9 @@ def dispute_request(
     req.dispute_reason = body.reason
     db.commit()
     db.refresh(req)
+
+    log_action(db, user_id=user.id, user_email=user.email, user_role=user.role,
+               action="dispute", resource_type="pa_request", resource_id=req.id,
+               detail=f"Disputed claim: {body.reason[:200]}")
+
     return req
