@@ -84,6 +84,21 @@ async def verify_documents(
 
     db.commit()
 
+    # Start the AI pipeline after documents are saved and verified
+    if req.status == "pending":
+        import threading
+        def _run_pipeline():
+            from ..database import SessionLocal as _SL
+            from ..agents.orchestrator import run_pipeline as _rp
+            _db = _SL()
+            try:
+                _req = _db.get(PARequest, req.id)
+                if _req:
+                    _rp(_db, _req)
+            finally:
+                _db.close()
+        threading.Thread(target=_run_pipeline, daemon=True).start()
+
     return {
         "request_id": req.id,
         "total": len(results),

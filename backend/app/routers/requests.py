@@ -104,7 +104,9 @@ def create_request(
                action="create", resource_type="pa_request", resource_id=req.id,
                detail=f"Created PA request {code} for {data.patient_name}")
 
-    bg.add_task(_process_in_bg, req.id)
+    # Only auto-start pipeline if no documents to upload (upload triggers pipeline via verify_documents)
+    if not data.documents:
+        bg.add_task(_process_in_bg, req.id)
     return req
 
 

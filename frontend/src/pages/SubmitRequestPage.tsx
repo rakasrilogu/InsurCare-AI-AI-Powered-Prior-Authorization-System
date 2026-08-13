@@ -85,10 +85,18 @@ const SubmitRequestPage = () => {
         documents: uploadedFiles.map(f => f.name),
       };
       const created = await api.createRequest(payload);
-      toast({
-        title: 'PA Request Submitted!',
-        description: `${created.request_code} is now being processed by the 6-agent AI pipeline.`,
-      });
+      if (uploadedFiles.length > 0) {
+        const verifyResult = await api.verifyDocuments(created.id, uploadedFiles);
+        toast({
+          title: 'PA Request Submitted!',
+          description: `${verifyResult.verified}/${verifyResult.total} documents verified.`,
+        });
+      } else {
+        toast({
+          title: 'PA Request Submitted!',
+          description: `${created.request_code} is now being processed by the 6-agent AI pipeline.`,
+        });
+      }
       navigate(`/agent-tracking/${created.id}`);
     } catch (err: any) {
       toast({ title: 'Submission failed', description: err.message, variant: 'destructive' });

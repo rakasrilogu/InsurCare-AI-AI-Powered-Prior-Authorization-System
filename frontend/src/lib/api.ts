@@ -218,4 +218,20 @@ export const api = {
     const query = qs.toString();
     return requestValidated(z.array(AuditLogSchema), `/api/audit${query ? "?" + query : ""}`);
   },
+
+  verifyDocuments: async (requestId: number | string, files: File[]) => {
+    const form = new FormData();
+    for (const f of files) form.append("files", f);
+    const res = await fetch(`${BASE}/api/requests/${requestId}/verify-documents`, {
+      method: "POST",
+      headers: { ...authHeaders() },
+      body: form,
+    });
+    if (!res.ok) {
+      let msg = res.statusText;
+      try { const j = await res.json(); msg = j.detail || JSON.stringify(j); } catch {}
+      throw new Error(msg);
+    }
+    return res.json();
+  },
 };
