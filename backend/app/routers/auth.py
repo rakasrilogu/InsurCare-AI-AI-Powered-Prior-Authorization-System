@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models.user import User
 from ..models.refresh_token import RefreshToken
-from ..schemas.auth import SignupIn, LoginIn, RefreshTokenIn, TokenOut, UserOut
+from ..schemas.auth import SignupIn, LoginIn, RefreshTokenIn, TokenOut, UserOut, VALID_INSURERS
 from ..security import hash_password, verify_password, create_access_token, get_current_user
 from datetime import datetime, timezone
 import time
@@ -51,6 +51,8 @@ def signup(data: SignupIn, db: Session = Depends(get_db)):
 
     if data.role == "insurer" and not data.company_name:
         raise HTTPException(400, "Insurance company name is required for insurer role")
+    if data.role == "insurer" and data.company_name not in VALID_INSURERS:
+        raise HTTPException(400, f"Invalid insurance company. Must be one of: {', '.join(sorted(VALID_INSURERS))}")
     if data.role == "hospital" and not data.hospital:
         raise HTTPException(400, "Hospital name is required for hospital role")
 

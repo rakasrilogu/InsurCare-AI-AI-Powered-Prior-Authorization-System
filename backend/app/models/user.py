@@ -14,4 +14,5 @@ class User(Base):
     company_name    = Column(String(255), nullable=True)   # for insurer
     specialization  = Column(String(255), nullable=True)
     hashed_password = Column(String(255), nullable=False)
+    is_verified     = Column(Boolean, default=False, nullable=False)  # insurer identity verified
     created_at      = Column(DateTime(timezone=True), server_default=func.now())

@@ -2,6 +2,15 @@ from pydantic import BaseModel, EmailStr
 from datetime import datetime
 from typing import Optional
 
+# Closed list of known insurers — matches the policy_rag.py corpus
+VALID_INSURERS = {
+    "Star Health",
+    "HDFC Ergo",
+    "ICICI Lombard",
+    "Max Bupa",
+    "Bajaj Allianz",
+}
+
 class SignupIn(BaseModel):
     email:          EmailStr
     password:       str
@@ -34,6 +43,7 @@ class UserOut(BaseModel):
     hospital:       Optional[str] = None
     company_name:   Optional[str] = None
     specialization: Optional[str] = None
+    is_verified:    bool = False
     created_at:     datetime
     class Config:
         from_attributes = True

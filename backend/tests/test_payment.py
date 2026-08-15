@@ -2,6 +2,12 @@
 Tests for payment approval and dispute endpoints (insurer-only).
 """
 import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from app.models.user import User
+
+
+TEST_DB_URL = "sqlite:///./test_shared.db"
 
 
 @pytest.fixture(scope="module")
@@ -9,10 +15,18 @@ def insurer(client):
     r = client.post("/api/auth/signup", json={
         "email": "pay-insurer@test.com", "password": "test1234",
         "confirm_password": "test1234", "full_name": "Pay Insurer",
-        "role": "insurer", "company_name": "Pay Health",
+        "role": "insurer", "company_name": "Star Health",
     })
     data = r.json()
-    return {"token": data["access_token"], "company": "Pay Health"}
+    # Verify the insurer via direct DB update
+    test_engine = create_engine(TEST_DB_URL, connect_args={"check_same_thread": False})
+    sess = sessionmaker(bind=test_engine)()
+    user = sess.query(User).filter(User.email == "pay-insurer@test.com").first()
+    if user:
+        user.is_verified = True
+        sess.commit()
+    sess.close()
+    return {"token": data["access_token"], "company": "Star Health"}
 
 
 @pytest.fixture(scope="module")

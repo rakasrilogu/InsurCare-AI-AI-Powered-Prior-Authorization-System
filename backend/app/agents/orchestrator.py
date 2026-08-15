@@ -24,8 +24,8 @@ import httpx
 from ..models.pa_request import PARequest
 from ..models.agent_run import AgentRun
 
-HAIKU  = "gemini-2.5-flash"
-SONNET = "gemini-2.5-flash"
+FAST_MODEL    = "gemini-2.5-flash"
+REASONING_MODEL = "gemini-2.5-flash"
 API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 
 from .policy_rag import retrieve_policy_clauses, build_grounded_context, extract_financial_facts
@@ -94,15 +94,46 @@ def _parse_json(text: str) -> dict:
 
 
 # ── DB helpers ─────────────────────────────────────────────────────────────────
+# Agent log cache — Redis-backed with short TTL, falls back to in-memory dict.
 _LOG_CACHE: dict = {}  # {(request_id, agent_id): [log_entries]}
+_LOG_TTL = 3600  # 1 hour TTL for cached logs
+
+def _get_log_redis():
+    """Get Redis client for log caching (separate from rate limiter)."""
+    try:
+        from ..config import settings
+        import redis as _redis_mod
+        r = _redis_mod.from_url(settings.REDIS_URL, decode_responses=True, socket_timeout=2)
+        r.ping()
+        return r
+    except Exception:
+        return None
+
+_log_redis = None  # lazily initialized
 
 def _log_progress(db: Session, request_id: int, agent_id: str, message: str):
-    """Append a timestamped log entry — uses in-memory cache + DB backup."""
+    """Append a timestamped log entry — uses Redis cache + DB backup."""
     entry = {"t": datetime.now(timezone.utc).isoformat(), "msg": message}
     key = (request_id, agent_id)
-    if key not in _LOG_CACHE:
-        _LOG_CACHE[key] = []
-    _LOG_CACHE[key].append(entry)
+
+    # Try Redis first
+    global _log_redis
+    if _log_redis is None:
+        _log_redis = _get_log_redis()
+
+    if _log_redis:
+        try:
+            import json as _json
+            rkey = f"agent_log:{request_id}:{agent_id}"
+            _log_redis.rpush(rkey, _json.dumps(entry))
+            _log_redis.expire(rkey, _LOG_TTL)
+        except Exception:
+            pass
+    else:
+        # Fallback: in-memory dict
+        if key not in _LOG_CACHE:
+            _LOG_CACHE[key] = []
+        _LOG_CACHE[key].append(entry)
 
     # Also try DB backup (silent if fails)
     try:
@@ -126,9 +157,22 @@ def _mark_active(db: Session, request_id: int, agent_id: str):
 def _save_run(db: Session, request_id: int, agent_id: str, status: str,
               output: str = "", details: dict = None,
               confidence: float = None, duration_ms: int = None):
-    # Read logs from cache (most reliable) + DB backup
+    # Read logs from Redis (most reliable) → in-memory cache → DB backup
     key = (request_id, agent_id)
-    active_logs = _LOG_CACHE.pop(key, [])
+    active_logs = []
+
+    if _log_redis:
+        try:
+            import json as _json
+            rkey = f"agent_log:{request_id}:{agent_id}"
+            raw = _log_redis.lrange(rkey, 0, -1)
+            active_logs = [_json.loads(r) for r in raw]
+            _log_redis.delete(rkey)
+        except Exception:
+            pass
+
+    if not active_logs:
+        active_logs = _LOG_CACHE.pop(key, [])
 
     # Also try to get logs from DB active run (backup)
     existing = db.query(AgentRun).filter_by(
@@ -220,7 +264,7 @@ Documents uploaded: {len(docs)}{doc_verification}"""
 
     _log_progress(db, req.id, "intake", "Validating PA request fields...")
     try:
-        result = _parse_json(_call_claude(HAIKU, SYSTEM, prompt, db=db, request_id=req.id, agent_id="intake"))
+        result = _parse_json(_call_claude(FAST_MODEL, SYSTEM, prompt, db=db, request_id=req.id, agent_id="intake"))
     except Exception as e:
         dur = int((time.time()-t0)*1000)
         _save_run(db, req.id, "intake", "error",
@@ -285,7 +329,7 @@ Clinical justification: {req.clinical_justification}"""
 
     _log_progress(db, req.id, "eligibility", "Retrieving policy clauses for eligibility check...")
     try:
-        result = _parse_json(_call_claude(SONNET, SYSTEM, prompt, max_tokens=3072, db=db, request_id=req.id, agent_id="eligibility"))
+        result = _parse_json(_call_claude(REASONING_MODEL, SYSTEM, prompt, max_tokens=3072, db=db, request_id=req.id, agent_id="eligibility"))
     except Exception as e:
         dur = int((time.time()-t0)*1000)
         _save_run(db, req.id, "eligibility", "error",
@@ -383,7 +427,7 @@ List every clause ID that is relevant in matched_clauses or exclusions_triggered
 
     try:
         _log_progress(db, req.id, "policy", "Analyzing clause coverage with Gemini...")
-        result = _parse_json(_call_claude(SONNET, SYSTEM, prompt, max_tokens=4096, db=db, request_id=req.id, agent_id="policy"))
+        result = _parse_json(_call_claude(REASONING_MODEL, SYSTEM, prompt, max_tokens=4096, db=db, request_id=req.id, agent_id="policy"))
     except Exception as e:
         _log_progress(db, req.id, "policy", f"LLM analysis failed, falling back to RAG metadata: {e}")
         # Fallback: derive from RAG metadata directly without LLM
@@ -506,7 +550,7 @@ Policy coverage: covered={ctx.get('policy',{}).get('covered', True)}"""
 
     _log_progress(db, req.id, "risk", "Calculating patient risk score...")
     try:
-        result = _parse_json(_call_claude(SONNET, SYSTEM, prompt, db=db, request_id=req.id, agent_id="risk"))
+        result = _parse_json(_call_claude(REASONING_MODEL, SYSTEM, prompt, db=db, request_id=req.id, agent_id="risk"))
         # Always recalculate risk_score from components to ensure formula accuracy
         sev = max(0, min(100, int(result.get("severity_score", 50))))
         delay = max(0, min(100, int(result.get("delay_factor_score", 40))))
@@ -613,7 +657,7 @@ Apply the decision rules strictly. Produce a decision that is fully explainable.
 
     _log_progress(db, req.id, "decision", "Synthesizing final decision from all agent outputs...")
     try:
-        result = _parse_json(_call_claude(SONNET, SYSTEM, prompt, max_tokens=4096, db=db, request_id=req.id, agent_id="decision"))
+        result = _parse_json(_call_claude(REASONING_MODEL, SYSTEM, prompt, max_tokens=4096, db=db, request_id=req.id, agent_id="decision"))
 
         # Enforce hard business rules
         if not is_eligible:
@@ -741,7 +785,7 @@ Appeal pathway: {decision_data.get('appeal_pathway','')}"""
 
     _log_progress(db, req.id, "communication", "Generating plain-English summaries...")
     try:
-        result = _parse_json(_call_claude(HAIKU, SYSTEM, prompt, max_tokens=1000, db=db, request_id=req.id, agent_id="communication"))
+        result = _parse_json(_call_claude(FAST_MODEL, SYSTEM, prompt, max_tokens=1000, db=db, request_id=req.id, agent_id="communication"))
     except Exception as e:
         _log_progress(db, req.id, "communication", f"LLM summary failed, using fallback: {e}")
         if decision_str == "APPROVED":

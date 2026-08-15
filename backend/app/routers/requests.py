@@ -16,28 +16,61 @@ from ..services.audit import log_action
 
 router = APIRouter(prefix="/api/requests", tags=["requests"])
 
-# ── Per-user rate limiting ────────────────────────────────────────────────────
-# Allows at most RATE_LIMIT_MAX submissions per RATE_LIMIT_WINDOW seconds
-# per authenticated user, preventing abuse of expensive Gemini pipeline runs.
+# ── Per-user rate limiting (Redis-backed) ────────────────────────────────────
+# Uses Redis sorted sets for sliding-window rate limiting.
+# Falls back to in-memory dict if Redis is unavailable.
 RATE_LIMIT_WINDOW = 60   # seconds
 RATE_LIMIT_MAX    = 5    # submissions per window
 
+_redis_client = None
 _rate_store: dict[int, list[float]] = defaultdict(list)
 _rate_lock = Lock()
 
+def _get_redis():
+    global _redis_client
+    if _redis_client is not None:
+        return _redis_client
+    try:
+        from ..config import settings
+        import redis
+        _redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True, socket_timeout=2)
+        _redis_client.ping()
+        return _redis_client
+    except Exception:
+        _redis_client = False  # sentinel: Redis unavailable
+        return None
+
 def _check_rate_limit(user_id: int):
     now = time.time()
-    with _rate_lock:
-        timestamps = _rate_store[user_id]
-        # Drop timestamps outside the current window
-        _rate_store[user_id] = [t for t in timestamps if now - t < RATE_LIMIT_WINDOW]
-        if len(_rate_store[user_id]) >= RATE_LIMIT_MAX:
+    r = _get_redis()
+    if r and r is not False:
+        # Redis sorted-set sliding window
+        key = f"rate_limit:{user_id}"
+        now = time.time()
+        pipe = r.pipeline()
+        pipe.zremrangebyscore(key, 0, now - RATE_LIMIT_WINDOW)
+        pipe.zadd(key, {str(now): now})
+        pipe.expire(key, RATE_LIMIT_WINDOW)
+        count = pipe.execute()[1]
+        if count > RATE_LIMIT_MAX:
+            r.zrem(key, str(now))
             raise HTTPException(
                 429,
                 f"Rate limit exceeded: max {RATE_LIMIT_MAX} submissions per "
                 f"{RATE_LIMIT_WINDOW}s. Please wait before submitting again."
             )
-        _rate_store[user_id].append(now)
+    else:
+        # Fallback: in-memory dict
+        with _rate_lock:
+            timestamps = _rate_store[user_id]
+            _rate_store[user_id] = [t for t in timestamps if now - t < RATE_LIMIT_WINDOW]
+            if len(_rate_store[user_id]) >= RATE_LIMIT_MAX:
+                raise HTTPException(
+                    429,
+                    f"Rate limit exceeded: max {RATE_LIMIT_MAX} submissions per "
+                    f"{RATE_LIMIT_WINDOW}s. Please wait before submitting again."
+                )
+            _rate_store[user_id].append(now)
 
 
 # ── Input sanitization ────────────────────────────────────────────────────────
@@ -80,6 +113,24 @@ def _process_in_bg(request_id: int):
             run_pipeline(db, req)
     finally:
         db.close()
+
+
+def _scope_response(req, user) -> PARequestOut:
+    """Scope API response fields based on user role.
+
+    Hospital users should NOT see:
+      - policy_clauses_cited (insurer audit trail)
+      - agent_run output / details (risk severity/delay/age breakdown, raw LLM output)
+
+    Insurers see the full response.
+    """
+    out = PARequestOut.model_validate(req)
+    if user.role == "hospital":
+        out.policy_clauses_cited = []
+        for run in out.agent_runs:
+            run.output = None
+            run.details = None
+    return out
 
 
 @router.post("", response_model=PARequestOut, status_code=201)
@@ -139,7 +190,7 @@ def list_requests(
     else:
         q = q.filter(False)
 
-    return q.order_by(PARequest.created_at.desc()).limit(200).all()
+    return [_scope_response(r, user) for r in q.order_by(PARequest.created_at.desc()).limit(200).all()]
 
 
 @router.get("/{request_id}", response_model=PARequestOut)
@@ -173,7 +224,7 @@ def get_request(
     else:
         raise HTTPException(403, "Access denied")
 
-    return req
+    return _scope_response(req, user)
 
 
 class DisputeIn(BaseModel):
@@ -188,6 +239,8 @@ def approve_payment(
 ):
     if user.role != "insurer":
         raise HTTPException(403, "Only insurers can approve payments")
+    if not user.is_verified:
+        raise HTTPException(403, "Account pending verification")
 
     req = db.get(PARequest, request_id)
     if not req:
@@ -227,6 +280,8 @@ def dispute_request(
 ):
     if user.role != "insurer":
         raise HTTPException(403, "Only insurers can dispute decisions")
+    if not user.is_verified:
+        raise HTTPException(403, "Account pending verification")
 
     req = db.get(PARequest, request_id)
     if not req:

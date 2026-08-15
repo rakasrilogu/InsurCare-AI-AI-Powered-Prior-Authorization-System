@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
 from .database import Base, engine, SessionLocal
 from . import models  # noqa: F401  (register models)
-from .routers import auth, requests, analytics, chat, documents, audit
+from .routers import auth, requests, analytics, chat, documents, audit, admin
 from .models.agent_run import AgentRun
 from .models.pa_request import PARequest
 from .models.user import User
@@ -45,6 +45,7 @@ app.include_router(analytics.router)
 app.include_router(chat.router)
 app.include_router(documents.router)
 app.include_router(audit.router)
+app.include_router(admin.router)
 
 @app.get("/")
 def root():
