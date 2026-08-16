@@ -160,7 +160,7 @@ POLICY_CORPUS: list[dict] = [
 
     # ═══════════════════════════════  Star Health  ════════════════════════════
 
-    {"insurer": "Star Health", "clause_id": "SH-4.1",
+    {"insurer": "Star Health", "policy_version": "2026", "clause_id": "SH-4.1",
      "clause_type": "coverage", "covered": True,
      "coverage_pct": 0.80, "deductible_inr": 0.0, "sub_limit_inr": 0.0,
      "waiting_days": 0, "preauth_required": True,
@@ -173,7 +173,7 @@ POLICY_CORPUS: list[dict] = [
          "approved day-care schedule."
      )},
 
-    {"insurer": "Star Health", "clause_id": "SH-4.2",
+    {"insurer": "Star Health", "policy_version": "2026", "clause_id": "SH-4.2",
      "clause_type": "coverage", "covered": True,
      "coverage_pct": 0.80, "deductible_inr": 0.0, "sub_limit_inr": 0.0,
      "waiting_days": 0, "preauth_required": True,
@@ -185,7 +185,7 @@ POLICY_CORPUS: list[dict] = [
          "hospital. Coverage is 80% of admissible claim. Cosmetic or aesthetic surgeries are excluded."
      )},
 
-    {"insurer": "Star Health", "clause_id": "SH-4.3",
+    {"insurer": "Star Health", "policy_version": "2026", "clause_id": "SH-4.3",
      "clause_type": "coverage", "covered": True,
      "coverage_pct": 0.80, "deductible_inr": 0.0, "sub_limit_inr": 0.0,
      "waiting_days": 0, "preauth_required": True,
@@ -199,7 +199,7 @@ POLICY_CORPUS: list[dict] = [
          "Pre-authorisation is mandatory."
      )},
 
-    {"insurer": "Star Health", "clause_id": "SH-5.1",
+    {"insurer": "Star Health", "policy_version": "2026", "clause_id": "SH-5.1",
      "clause_type": "coverage", "covered": True,
      "coverage_pct": 0.80, "deductible_inr": 0.0, "sub_limit_inr": 0.0,
      "waiting_days": 0, "preauth_required": True,
@@ -212,7 +212,7 @@ POLICY_CORPUS: list[dict] = [
          "Pre-authorisation mandatory."
      )},
 
-    {"insurer": "Star Health", "clause_id": "SH-7.1",
+    {"insurer": "Star Health", "policy_version": "2026", "clause_id": "SH-7.1",
      "clause_type": "waiting_period", "covered": False,
      "coverage_pct": 0.0, "deductible_inr": 0.0, "sub_limit_inr": 0.0,
      "waiting_days": 730, "preauth_required": False,
@@ -224,7 +224,7 @@ POLICY_CORPUS: list[dict] = [
          "pre-existing conditions within this period will be denied."
      )},
 
-    {"insurer": "Star Health", "clause_id": "SH-8.1",
+    {"insurer": "Star Health", "policy_version": "2026", "clause_id": "SH-8.1",
      "clause_type": "exclusion", "covered": False,
      "coverage_pct": 0.0, "deductible_inr": 0.0, "sub_limit_inr": 0.0,
      "waiting_days": 0, "preauth_required": False,
@@ -236,7 +236,7 @@ POLICY_CORPUS: list[dict] = [
          "Routine dental care, implants, orthodontics, and teeth whitening are not covered."
      )},
 
-    {"insurer": "Star Health", "clause_id": "SH-9.1",
+    {"insurer": "Star Health", "policy_version": "2026", "clause_id": "SH-9.1",
      "clause_type": "sub_limit", "covered": True,
      "coverage_pct": 0.80, "deductible_inr": 0.0, "sub_limit_inr": 5000.0,
      "waiting_days": 0, "preauth_required": False,
@@ -250,7 +250,7 @@ POLICY_CORPUS: list[dict] = [
 
     # ═══════════════════════════════  HDFC Ergo  ══════════════════════════════
 
-    {"insurer": "HDFC Ergo", "clause_id": "HE-3.1",
+    {"insurer": "HDFC Ergo", "policy_version": "2026", "clause_id": "HE-3.1",
      "clause_type": "coverage", "covered": True,
      "coverage_pct": 0.90, "deductible_inr": 0.0, "sub_limit_inr": 0.0,
      "waiting_days": 0, "preauth_required": True,
@@ -262,7 +262,7 @@ POLICY_CORPUS: list[dict] = [
          "Imaging for screening purposes without a specialist referral is not covered."
      )},
 
-    {"insurer": "HDFC Ergo", "clause_id": "HE-4.1",
+    {"insurer": "HDFC Ergo", "policy_version": "2026", "clause_id": "HE-4.1",
      "clause_type": "coverage", "covered": True,
      "coverage_pct": 0.90, "deductible_inr": 0.0, "sub_limit_inr": 0.0,
      "waiting_days": 0, "preauth_required": True,
@@ -275,7 +275,7 @@ POLICY_CORPUS: list[dict] = [
          "Spinal surgeries require neurologist or orthopaedic specialist recommendation."
      )},
 
-    {"insurer": "HDFC Ergo", "clause_id": "HE-7.1",
+    {"insurer": "HDFC Ergo", "policy_version": "2026", "clause_id": "HE-7.1",
      "clause_type": "waiting_period", "covered": False,
      "coverage_pct": 0.0, "deductible_inr": 0.0, "sub_limit_inr": 0.0,
      "waiting_days": 1095, "preauth_required": False,
@@ -287,7 +287,7 @@ POLICY_CORPUS: list[dict] = [
          "is considered pre-existing."
      )},
 
-    {"insurer": "HDFC Ergo", "clause_id": "HE-9.1",
+    {"insurer": "HDFC Ergo", "policy_version": "2026", "clause_id": "HE-9.1",
      "clause_type": "coverage", "covered": True,
      "coverage_pct": 0.90, "deductible_inr": 0.0, "sub_limit_inr": 0.0,
      "waiting_days": 0, "preauth_required": True,
@@ -301,7 +301,7 @@ POLICY_CORPUS: list[dict] = [
 
     # ═══════════════════════════════  ICICI Lombard  ══════════════════════════
 
-    {"insurer": "ICICI Lombard", "clause_id": "IL-5.2",
+    {"insurer": "ICICI Lombard", "policy_version": "2026", "clause_id": "IL-5.2",
      "clause_type": "coverage", "covered": True,
      "coverage_pct": 0.75, "deductible_inr": 0.0, "sub_limit_inr": 0.0,
      "waiting_days": 0, "preauth_required": True,
@@ -313,7 +313,7 @@ POLICY_CORPUS: list[dict] = [
          "under Clause 3.1. Prior cardiologist consultation required."
      )},
 
-    {"insurer": "ICICI Lombard", "clause_id": "IL-6.3",
+    {"insurer": "ICICI Lombard", "policy_version": "2026", "clause_id": "IL-6.3",
      "clause_type": "coverage", "covered": True,
      "coverage_pct": 0.75, "deductible_inr": 0.0, "sub_limit_inr": 0.0,
      "waiting_days": 0, "preauth_required": True,
@@ -325,7 +325,7 @@ POLICY_CORPUS: list[dict] = [
          "Post-surgical physiotherapy up to ₹20,000 reimbursable."
      )},
 
-    {"insurer": "ICICI Lombard", "clause_id": "IL-7.1",
+    {"insurer": "ICICI Lombard", "policy_version": "2026", "clause_id": "IL-7.1",
      "clause_type": "waiting_period", "covered": False,
      "coverage_pct": 0.0, "deductible_inr": 0.0, "sub_limit_inr": 0.0,
      "waiting_days": 730, "preauth_required": False,
@@ -338,7 +338,7 @@ POLICY_CORPUS: list[dict] = [
 
     # ═══════════════════════════════  Max Bupa  ═══════════════════════════════
 
-    {"insurer": "Max Bupa", "clause_id": "MB-4.1",
+    {"insurer": "Max Bupa", "policy_version": "2026", "clause_id": "MB-4.1",
      "clause_type": "coverage", "covered": True,
      "coverage_pct": 0.85, "deductible_inr": 0.0, "sub_limit_inr": 0.0,
      "waiting_days": 0, "preauth_required": True,
@@ -350,7 +350,7 @@ POLICY_CORPUS: list[dict] = [
          "Day-care procedures from the approved list of 540+ procedures are covered."
      )},
 
-    {"insurer": "Max Bupa", "clause_id": "MB-4.2",
+    {"insurer": "Max Bupa", "policy_version": "2026", "clause_id": "MB-4.2",
      "clause_type": "coverage", "covered": True,
      "coverage_pct": 1.0, "deductible_inr": 0.0, "sub_limit_inr": 0.0,
      "waiting_days": 0, "preauth_required": True,
@@ -362,7 +362,7 @@ POLICY_CORPUS: list[dict] = [
          "process required."
      )},
 
-    {"insurer": "Max Bupa", "clause_id": "MB-8.1",
+    {"insurer": "Max Bupa", "policy_version": "2026", "clause_id": "MB-8.1",
      "clause_type": "exclusion", "covered": False,
      "coverage_pct": 0.0, "deductible_inr": 0.0, "sub_limit_inr": 0.0,
      "waiting_days": 0, "preauth_required": False,
@@ -375,7 +375,7 @@ POLICY_CORPUS: list[dict] = [
 
     # ═══════════════════════════════  Bajaj Allianz  ══════════════════════════
 
-    {"insurer": "Bajaj Allianz", "clause_id": "BA-3.1",
+    {"insurer": "Bajaj Allianz", "policy_version": "2026", "clause_id": "BA-3.1",
      "clause_type": "coverage", "covered": True,
      "coverage_pct": 0.80, "deductible_inr": 0.0, "sub_limit_inr": 0.0,
      "waiting_days": 0, "preauth_required": True,
@@ -387,7 +387,7 @@ POLICY_CORPUS: list[dict] = [
          "prior to admission."
      )},
 
-    {"insurer": "Bajaj Allianz", "clause_id": "BA-8.1",
+    {"insurer": "Bajaj Allianz", "policy_version": "2026", "clause_id": "BA-8.1",
      "clause_type": "exclusion", "covered": False,
      "coverage_pct": 0.0, "deductible_inr": 0.0, "sub_limit_inr": 0.0,
      "waiting_days": 0, "preauth_required": False,
@@ -399,7 +399,7 @@ POLICY_CORPUS: list[dict] = [
          "arising directly from an accidental injury."
      )},
 
-    {"insurer": "Bajaj Allianz", "clause_id": "BA-8.2",
+    {"insurer": "Bajaj Allianz", "policy_version": "2026", "clause_id": "BA-8.2",
      "clause_type": "coverage", "covered": True,
      "coverage_pct": 0.80, "deductible_inr": 0.0, "sub_limit_inr": 0.0,
      "waiting_days": 0, "preauth_required": True,
@@ -411,7 +411,7 @@ POLICY_CORPUS: list[dict] = [
          "dental injury is a direct consequence of the covered accident."
      )},
 
-    {"insurer": "Bajaj Allianz", "clause_id": "BA-5.3",
+    {"insurer": "Bajaj Allianz", "policy_version": "2026", "clause_id": "BA-5.3",
      "clause_type": "coverage", "covered": True,
      "coverage_pct": 0.80, "deductible_inr": 0.0, "sub_limit_inr": 0.0,
      "waiting_days": 0, "preauth_required": True,
@@ -423,7 +423,7 @@ POLICY_CORPUS: list[dict] = [
          "corrective lens prescription are not covered."
      )},
 
-    {"insurer": "Bajaj Allianz", "clause_id": "BA-7.1",
+    {"insurer": "Bajaj Allianz", "policy_version": "2026", "clause_id": "BA-7.1",
      "clause_type": "waiting_period", "covered": False,
      "coverage_pct": 0.0, "deductible_inr": 0.0, "sub_limit_inr": 0.0,
      "waiting_days": 730, "preauth_required": False,
@@ -501,6 +501,7 @@ def retrieve_policy_clauses(
     diagnosis: str,
     clinical_justification: str,
     n_results: int = 6,
+    policy_version: str = "2026",
 ) -> list[dict]:
     """
     Retrieve the top-n policy clauses most relevant to this PA request.
@@ -563,6 +564,8 @@ def retrieve_policy_clauses(
     for clause in POLICY_CORPUS:
         if insurer_key and clause["insurer"].lower() != insurer_key.lower():
             continue
+        if clause.get("policy_version", "2026") != policy_version:
+            continue
         text_lower = clause["text"].lower() + " " + clause["tags"].lower()
         match_count = sum(1 for kw in keywords if len(kw) > 3 and kw in text_lower)
         scored.append((match_count, clause))
@@ -586,7 +589,7 @@ def retrieve_policy_clauses(
         "waiting_days": c["waiting_days"],
         "preauth_required": c["preauth_required"],
         "similarity": 0.5, "text": c["text"],
-    } for c in POLICY_CORPUS if c["covered"] and (not insurer_key or c["insurer"] == insurer_key)][:n_results]
+    } for c in POLICY_CORPUS if c["covered"] and (not insurer_key or c["insurer"] == insurer_key) and c.get("policy_version", "2026") == policy_version][:n_results]
 
 
 def _match_insurer(raw: str) -> Optional[str]:
