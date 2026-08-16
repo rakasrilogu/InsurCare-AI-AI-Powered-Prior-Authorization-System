@@ -75,7 +75,7 @@ export const PARequestSchema = z.object({
   procedure_code: z.string(),
   diagnosis: z.string().nullable(),
   clinical_justification: z.string(),
-  documents: z.array(z.string()),
+  documents: z.array(z.any()),
   status: z.string(),
   decision: z.string().nullable(),
   confidence_score: z.number().nullable(),
@@ -90,6 +90,15 @@ export const PARequestSchema = z.object({
   appeal_pathway: z.string().nullable().optional(),
   doctor_recommendation: z.string().nullable().optional(),
   plain_english_summary: z.string().nullable().optional(),
+  decision_evidence: z.record(z.unknown()).nullable().optional(),
+  decision_trace: z.record(z.unknown()).nullable().optional(),
+  human_review_requested: z.boolean().optional().default(false),
+  human_review_reasons: z.array(z.string()).default([]),
+  human_reviewer_id: z.number().nullable().optional(),
+  human_review_notes: z.string().nullable().optional(),
+  human_review_decision: z.string().nullable().optional(),
+  human_reviewed_at: z.string().nullable().optional(),
+  missing_information: z.array(z.string()).default([]),
   payment_status: z.string().optional().default('not_applicable'),
   transaction_id: z.string().nullable().optional(),
   disbursed_amount_inr: z.number().nullable().optional(),
@@ -234,4 +243,13 @@ export const api = {
     }
     return res.json();
   },
+
+  submitHumanReview: (id: number | string, decision: string, notes: string, approvedAmount?: number) =>
+    requestValidated(PARequestSchema, `/api/requests/${id}/human-review`, {
+      method: "POST",
+      body: JSON.stringify({ decision, notes, approved_amount_inr: approvedAmount }),
+    }),
+
+  getDecisionTrace: (id: number | string) =>
+    request<Record<string, unknown>>(`/api/requests/${id}/decision-trace`),
 };

@@ -76,6 +76,21 @@ class PARequestOut(BaseModel):
     doctor_recommendation: str | None = None
     plain_english_summary: str | None = None
 
+    # Structured evidence and trace
+    decision_evidence: dict | None = None
+    decision_trace: dict | None = None
+
+    # Human review
+    human_review_requested: bool = False
+    human_review_reasons: list[str] = []
+    human_reviewer_id: int | None = None
+    human_review_notes: str | None = None
+    human_review_decision: str | None = None
+    human_reviewed_at: datetime | None = None
+
+    # Missing information
+    missing_information: list[str] = []
+
     payment_status: str = "not_applicable"
     transaction_id: str | None = None
     disbursed_amount_inr: float | None = None

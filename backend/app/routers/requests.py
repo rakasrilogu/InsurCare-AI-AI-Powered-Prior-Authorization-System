@@ -231,6 +231,110 @@ class DisputeIn(BaseModel):
     reason: str
 
 
+class HumanReviewIn(BaseModel):
+    decision: str  # approved | denied | partially_approved
+    notes: str = ""
+    approved_amount_inr: float | None = None  # optional override
+
+
+@router.post("/{request_id}/human-review", response_model=PARequestOut)
+def human_review_decision(
+    request_id: int,
+    body: HumanReviewIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    if user.role != "insurer":
+        raise HTTPException(403, "Only insurers can perform human review")
+    if not user.is_verified:
+        raise HTTPException(403, "Account pending verification")
+
+    req = db.get(PARequest, request_id)
+    if not req:
+        raise HTTPException(404, "Not found")
+    if req.insurance_provider != user.company_name:
+        raise HTTPException(403, "Access denied")
+
+    valid_decisions = {"approved", "denied", "partially_approved"}
+    if body.decision not in valid_decisions:
+        raise HTTPException(400, f"Decision must be one of: {', '.join(valid_decisions)}")
+
+    # Update with human review
+    req.human_reviewer_id = user.id
+    req.human_review_notes = body.notes
+    req.human_review_decision = body.decision
+    req.human_reviewed_at = datetime.now(timezone.utc)
+    req.decision = body.decision
+    req.human_review_requested = False
+
+    # Apply override amount if provided
+    if body.approved_amount_inr is not None and body.decision in ("approved", "partially_approved"):
+        req.approved_amount_inr = body.approved_amount_inr
+
+    # Set status
+    status_map = {
+        "approved": "approved",
+        "denied": "rejected",
+        "partially_approved": "partially_approved",
+    }
+    req.status = status_map.get(body.decision, "escalated")
+
+    db.commit()
+    db.refresh(req)
+
+    log_action(db, user_id=user.id, user_email=user.email, user_role=user.role,
+               action="human_review", resource_type="pa_request", resource_id=req.id,
+               detail=f"Human review: {body.decision}. Notes: {body.notes[:200]}")
+
+    return req
+
+
+@router.get("/{request_id}/decision-trace")
+def get_decision_trace(
+    request_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    req = db.get(PARequest, request_id)
+    if not req:
+        raise HTTPException(404, "Not found")
+
+    # RBAC check
+    if user.role == "hospital":
+        if user.hospital:
+            hospital_user_ids = [
+                u.id for u in db.query(User).filter(
+                    User.role == "hospital",
+                    User.hospital == user.hospital
+                ).all()
+            ]
+            if req.user_id not in hospital_user_ids:
+                raise HTTPException(403, "Access denied")
+        else:
+            raise HTTPException(403, "Access denied")
+    elif user.role == "insurer":
+        if req.insurance_provider != user.company_name:
+            raise HTTPException(403, "Access denied")
+    else:
+        raise HTTPException(403, "Access denied")
+
+    return {
+        "request_id": req.id,
+        "request_code": req.request_code,
+        "decision": req.decision,
+        "decision_evidence": req.decision_evidence,
+        "decision_trace": req.decision_trace,
+        "human_review_requested": req.human_review_requested,
+        "human_review_reasons": req.human_review_reasons,
+        "human_reviewer_id": req.human_reviewer_id,
+        "human_review_notes": req.human_review_notes,
+        "human_review_decision": req.human_review_decision,
+        "human_reviewed_at": req.human_reviewed_at,
+        "missing_information": req.missing_information,
+        "validation_results": (req.decision_evidence or {}).get("validation_results", []),
+    }
+
+
 @router.post("/{request_id}/approve-payment", response_model=PARequestOut)
 def approve_payment(
     request_id: int,

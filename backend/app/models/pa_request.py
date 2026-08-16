@@ -51,6 +51,21 @@ class PARequest(Base):
     doctor_recommendation = Column(Text, nullable=True)
     plain_english_summary = Column(Text, nullable=True)
 
+    # Structured evidence (new: stores the full EvidenceObject for audit)
+    decision_evidence = Column(JSON, nullable=True)
+    decision_trace = Column(JSON, nullable=True)
+
+    # Human review
+    human_review_requested = Column(Boolean, default=False, nullable=False)
+    human_review_reasons = Column(JSON, default=list)
+    human_reviewer_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    human_review_notes = Column(Text, nullable=True)
+    human_review_decision = Column(String(50), nullable=True)
+    human_reviewed_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Missing information
+    missing_information = Column(JSON, default=list)
+
     # Payment
     payment_status = Column(String(30), default="not_applicable", nullable=False)
     transaction_id = Column(String(50), nullable=True)

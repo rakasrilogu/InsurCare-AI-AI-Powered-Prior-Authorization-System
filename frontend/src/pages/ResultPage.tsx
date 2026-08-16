@@ -553,6 +553,57 @@ export default function ResultPage() {
 
               </div>
 
+              {/* Missing Information — when requires_information */}
+              {req.status === 'requires_information' && req.missing_information?.length > 0 && (
+                <div className="bg-warning/5 rounded-2xl p-6 border border-warning/20 mt-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <AlertCircle className="w-5 h-5 text-warning" />
+                    <h3 className="font-bold text-foreground">Missing Information</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-3">Please upload the following documents and resubmit:</p>
+                  <div className="space-y-2">
+                    {req.missing_information.map((item: string, i: number) => (
+                      <div key={i} className="flex items-start gap-2 p-3 rounded-xl bg-warning/5 border border-warning/10">
+                        <XCircle className="w-4 h-4 text-warning shrink-0 mt-0.5" />
+                        <span className="text-sm text-foreground">{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <Link to="/submit">
+                    <Button className="mt-4 gradient-accent text-secondary-foreground border-0 gap-2" size="sm">
+                      Upload Documents & Resubmit <ArrowRight className="w-4 h-4" />
+                    </Button>
+                  </Link>
+                </div>
+              )}
+
+              {/* Human Review Status — when human review requested */}
+              {req.human_review_requested && (
+                <div className="bg-warning/5 rounded-2xl p-6 border border-warning/20 mt-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Clock className="w-5 h-5 text-warning" />
+                    <h3 className="font-bold text-foreground">Human Review Required</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-3">This request has been escalated for specialist review.</p>
+                  {req.human_review_reasons?.length > 0 && (
+                    <div className="space-y-2">
+                      {req.human_review_reasons.map((reason: string, i: number) => (
+                        <div key={i} className="flex items-start gap-2 p-3 rounded-xl bg-warning/5 border border-warning/10">
+                          <AlertCircle className="w-4 h-4 text-warning shrink-0 mt-0.5" />
+                          <span className="text-sm text-foreground">{reason}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {req.human_review_notes && (
+                    <div className="mt-3 p-3 rounded-xl bg-muted/30 border border-border/50">
+                      <p className="text-xs font-semibold text-muted-foreground mb-1">Reviewer Notes</p>
+                      <p className="text-sm text-foreground">{req.human_review_notes}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Agent Timeline — insurer only (full audit trail) */}
               {isInsurer && req.agent_runs?.length > 0 && (
                 <div className="bg-card rounded-2xl p-6 shadow-card">

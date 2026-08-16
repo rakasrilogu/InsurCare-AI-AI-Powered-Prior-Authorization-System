@@ -1,19 +1,29 @@
 """
-InsurCare AI — 6-Agent Pipeline with Explainable AI
+InsurCare AI — Evidence-Driven Pipeline with Deterministic Decisions
 
-Model split:
-  Flash → Intake, Communication           (structured, fast)
-  Pro   → Eligibility, Policy, Risk, Decision  (reasoning, accuracy)
+Architecture:
+  Intake (LLM extraction)
+    → Eligibility (RAG + LLM grounding)
+    → Policy (RAG + LLM grounding)
+    → Risk (LLM extraction)
+    → Evidence Object (structured)
+    → Deterministic Rule Engine (no LLM)
+    → Decision Engine (no LLM)
+    → Communication (LLM explanation)
+    → Payment (deterministic)
 
-Every decision produces:
-  - approved_amount_inr
-  - coverage_percentage
-  - approval_reasons / denial_reasons (plain English)
-  - policy_clauses_cited
-  - next_steps
-  - appeal_pathway
-  - doctor_recommendation
-  - plain_english_summary
+The LLM is used ONLY for:
+  - Extracting structured information from documents/text
+  - Reasoning about which policy clauses match
+  - Generating human-readable explanations
+
+The LLM is NEVER used to:
+  - Make the final approve/denied/escalated decision
+  - Calculate financial amounts
+  - Determine eligibility
+  - Invent policy clause IDs
+
+Every decision is deterministic, reproducible, and auditable.
 """
 
 import time, json, re, os
@@ -579,168 +589,184 @@ Policy coverage: covered={ctx.get('policy',{}).get('covered', True)}"""
         details=result, confidence=result.get("confidence",0.90), duration_ms=dur)
     ctx["risk"] = result
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-# AGENT 5 — Decision (Sonnet) — Final approve/deny with full explanation
-# ══════════════════════════════════════════════════════════════════════════════
+# ===========================================================================
+# AGENT 5 -- Deterministic Decision Engine (NO LLM)
+#
+# This replaces the old LLM-based Decision Agent with a deterministic,
+# rule-based decision engine. The decision is now:
+#   - Reproducible: same evidence -> same decision
+#   - Auditable: full decision trace with rule evaluations
+#   - Evidence-based: all facts come from structured evidence
+#   - Not LLM-dependent: no randomness in the decision
+# ===========================================================================
 def run_decision(db, req, ctx):
     t0 = time.time()
     _mark_active(db, req.id, "decision")
+    _log_progress(db, req.id, "decision", "Building structured evidence from agent outputs...")
+
+    from .evidence import (
+        EvidenceObject, PatientEvidence, DiagnosisEvidence, ProcedureEvidence,
+        DocumentEvidence, ClinicalEvidence, PolicyEvidence, PolicyClauseEvidence,
+        FinancialEvidence, RiskEvidence
+    )
+    from .decision_engine import DecisionEngine
 
     eligibility = ctx.get("eligibility", {})
-    policy      = ctx.get("policy", {})
-    risk        = ctx.get("risk", {})
+    policy_data = ctx.get("policy", {})
+    risk_data = ctx.get("risk", {})
 
-    # Hard business rules — these override LLM output
-    is_eligible = eligibility.get("eligible", True)
-    is_covered  = policy.get("covered", True)
+    # -- Build EvidenceObject from agent outputs -----------------------------
+    evidence = EvidenceObject(request_id=req.id, request_code=req.request_code)
 
-    SYSTEM = """You are the Decision Agent for InsurCare AI — the final clinical decision-maker.
-Your decision MUST be consistent with the evidence provided.
-Rules you must follow:
-1. If eligible=false → decision MUST be "denied"
-2. If covered=false → decision MUST be "denied"  
-3. If medical_necessity_met=false → decision should be "denied" unless risk is high (then "escalated")
-4. If risk_level is "high" or "elevated" AND there is any doubt → decision should be "escalated"
-5. Otherwise, if eligible=true AND covered=true AND medical_necessity_met=true → "approved"
+    evidence.patient = PatientEvidence(
+        name=req.patient_name, patient_id=req.patient_id,
+        age=req.patient_age, gender=req.patient_gender,
+        policy_active=eligibility.get("policy_active", True),
+        policy_number=req.policy_number, policy_version="2026",
+        sum_insured=float(req.sum_insured or 0),
+        deductible=float(req.deductible or 0),
+        coverage_pct=float(req.coverage_pct or 0),
+        valid_until=req.valid_until or "", plan_name=req.plan_name or "",
+    )
 
-Your output must include:
-- Exact insurance amount approved in INR (0 if denied)
-- Plain English reasons (one sentence each) for approval or denial
-- Specific policy clauses cited
-- Practical next steps for doctor and patient
+    evidence.diagnosis = DiagnosisEvidence(
+        code=req.diagnosis_code_icd10 or "", description=req.diagnosis or "",
+        is_pre_existing=False,
+        pre_existing_waiting_met=not eligibility.get("waiting_period_applicable", False),
+    )
 
-Respond with ONLY valid JSON, no markdown.
-Schema:
-{
-  "decision": "approved" | "denied" | "escalated",
-  "confidence": int,
-  "approved_amount_inr": int,
-  "coverage_percentage": int,
-  "approval_reasons": [str],
-  "denial_reasons": [str],
-  "policy_clauses_cited": [str],
-  "next_steps": [str],
-  "appeal_pathway": str,
-  "doctor_recommendation": str,
-  "clinical_reasoning": str
-}"""
+    evidence.procedure = ProcedureEvidence(
+        code=req.procedure_code, name=req.procedure_name,
+        cpt_code=req.procedure_code_cpt or req.procedure_code,
+        requested_amount=float(req.sum_insured or 0),
+        is_excluded=bool(policy_data.get("exclusions_triggered")),
+        exclusion_reason=", ".join(policy_data.get("exclusions_triggered", [])),
+    )
 
-    prompt = f"""Make the final PA decision:
+    docs = req.documents or []
+    verified_docs = [d for d in docs if isinstance(d, dict) and d.get("verification")]
+    evidence.documents = DocumentEvidence(
+        total_documents=len(docs),
+        verified_documents=sum(1 for d in verified_docs if d.get("verification", {}).get("status") == "verified"),
+        medical_report=any("medical" in str(d.get("filename", "")).lower() for d in docs),
+        doctor_recommendation=any("doctor" in str(d.get("filename", "")).lower() or "recommend" in str(d.get("filename", "")).lower() for d in docs),
+        diagnostic_report=any("diagnostic" in str(d.get("filename", "")).lower() or "lab" in str(d.get("filename", "")).lower() for d in docs),
+        all_documents_complete=len(docs) > 0 and all(d.get("verification", {}).get("status") == "verified" for d in verified_docs) if verified_docs else False,
+        document_status="verified" if verified_docs and all(d.get("verification", {}).get("status") == "verified" for d in verified_docs) else "partial" if verified_docs else "pending",
+    )
 
-PATIENT: {req.patient_name}, Age {req.patient_age}, Gender {req.patient_gender}
-PROCEDURE: {req.procedure_name} ({req.procedure_code})
-DIAGNOSIS: {req.diagnosis or 'Not specified'}
-INSURER: {req.insurance_provider} | POLICY: {req.policy_number}
-JUSTIFICATION: {req.clinical_justification}
+    severity_val = "severe" if risk_data.get("severity_score", 50) > 70 else "moderate" if risk_data.get("severity_score", 50) > 40 else "mild"
+    evidence.clinical = ClinicalEvidence(
+        severity=severity_val, urgency=risk_data.get("priority", "routine"),
+        medical_necessity=policy_data.get("medical_necessity_met", False),
+        medical_necessity_score=0.8 if policy_data.get("medical_necessity_met") else 0.4,
+        previous_treatment_failed=policy_data.get("conservative_treatment_documented", False),
+        conservative_treatment_documented=policy_data.get("conservative_treatment_documented", False),
+        clinical_justification=req.clinical_justification,
+    )
 
-ELIGIBILITY RESULT:
-- Eligible: {is_eligible}
-- Coverage: {eligibility.get('coverage_type')} ({eligibility.get('coverage_percentage')}%)
-- Ineligibility reasons: {eligibility.get('ineligibility_reasons', [])}
-- Waiting period: {eligibility.get('waiting_period_applicable')} — {eligibility.get('waiting_period_reason','')}
+    clauses_retrieved = []
+    for clause_id in policy_data.get("matched_clauses", []) + policy_data.get("exclusions_triggered", []):
+        clauses_retrieved.append(PolicyClauseEvidence(
+            clause_id=clause_id,
+            clause_type="exclusion" if clause_id in policy_data.get("exclusions_triggered", []) else "coverage",
+            covered=clause_id in policy_data.get("matched_clauses", []),
+        ))
 
-POLICY RESULT:
-- Covered: {is_covered}
-- Matched clauses: {policy.get('matched_clauses',[])}
-- Exclusions triggered: {policy.get('exclusions_triggered',[])}
-- Medical necessity met: {policy.get('medical_necessity_met')}
-- Approved amount: ₹{policy.get('approved_amount_inr',0):,}
-- Coverage limit: ₹{policy.get('coverage_limit_inr',0):,}
+    evidence.policy = PolicyEvidence(
+        insurer=req.insurance_provider, clauses_retrieved=clauses_retrieved,
+        matched_clauses=policy_data.get("matched_clauses", []),
+        exclusion_clauses=policy_data.get("exclusions_triggered", []),
+        coverage_applicable=policy_data.get("covered", False),
+        coverage_pct=float(eligibility.get("coverage_percentage", 80)) / 100.0,
+        deductible_inr=float(policy_data.get("deductible_inr", 0)),
+        sub_limit_inr=float(policy_data.get("sub_limit_inr", 0)), preauth_required=True,
+    )
 
-RISK RESULT:
-- Risk score: {risk.get('risk_score')} ({risk.get('risk_level')})
-- Priority: {risk.get('priority')}
-- Comorbidity flags: {risk.get('comorbidity_flags',[])}
+    evidence.financial = FinancialEvidence(
+        sum_insured=float(req.sum_insured or 0), deductible=float(req.deductible or 0),
+    )
 
-Apply the decision rules strictly. Produce a decision that is fully explainable."""
+    evidence.risk = RiskEvidence(
+        severity_score=float(risk_data.get("severity_score", 50)),
+        urgency_score=float(risk_data.get("delay_factor_score", 40)),
+        risk_score=float(risk_data.get("risk_score", 50)),
+        risk_level=risk_data.get("risk_level", "moderate"),
+        priority=risk_data.get("priority", "routine"),
+        comorbidities=risk_data.get("comorbidity_flags", []),
+    )
 
-    _log_progress(db, req.id, "decision", "Synthesizing final decision from all agent outputs...")
-    try:
-        result = _parse_json(_call_claude(REASONING_MODEL, SYSTEM, prompt, max_tokens=4096, db=db, request_id=req.id, agent_id="decision"))
+    # -- Run Deterministic Decision Engine -----------------------------------
+    _log_progress(db, req.id, "decision", "Running deterministic Rule Engine...")
+    engine = DecisionEngine(evidence)
+    evidence = engine.decide()
 
-        # Enforce hard business rules
-        if not is_eligible:
-            result["decision"] = "denied"
-            if not result.get("denial_reasons"):
-                result["denial_reasons"] = eligibility.get("ineligibility_reasons", ["Patient not eligible under this policy"])
-        if not is_covered:
-            result["decision"] = "denied"
-            excl = policy.get("exclusions_triggered", [])
-            if excl and not any(e in str(result.get("denial_reasons",[])) for e in excl):
-                result.setdefault("denial_reasons", []).extend(excl)
+    _log_progress(db, req.id, "decision",
+        f"Decision: {evidence.decision.upper()} | Confidence: {evidence.confidence.overall_confidence:.0%} | "
+        f"Human review: {'required' if evidence.human_review_required else 'not required'}")
 
-        # Normalize
-        decision_val = str(result.get("decision","escalated")).lower()
-        if decision_val not in {"approved","denied","escalated"}:
-            decision_val = "escalated"
-        result["decision"] = decision_val
-
-        # Enforce approved_amount from policy agent's deterministic calculation.
-        # The LLM decides approved/denied/escalated but MUST NOT override the
-        # amount already computed from real policy fields (sum_insured, deductible,
-        # coverage_pct).  Denied = ₹0; approved/escalated = policy agent figure.
-        if decision_val == "denied":
-            result["approved_amount_inr"] = 0
-        else:
-            result["approved_amount_inr"] = int(policy.get("approved_amount_inr", 0))
-        result["coverage_percentage"] = int(eligibility.get("coverage_percentage", 80))
-
-        confidence_pct = max(0, min(100, int(result.get("confidence", 75))))
-        result["confidence"] = confidence_pct
-
-    except Exception as e:
-        # On LLM error: deny or escalate only — never silently approve
-        if not is_eligible or not is_covered:
-            decision_val = "denied"
-            denial_reasons = (eligibility.get("ineligibility_reasons",[]) +
-                              policy.get("exclusions_triggered",[]) or
-                              ["Not eligible or not covered under current policy"])
-            approved_amt = 0
-        else:
-            # Cannot confirm approval without LLM reasoning — escalate for human review
-            decision_val = "escalated"
-            denial_reasons = []
-            approved_amt = 0
-
-        result = {
-            "decision": decision_val,
-            "confidence": 0,
-            "approved_amount_inr": approved_amt,
-            "coverage_percentage": int(eligibility.get("coverage_percentage", 0)),
-            "approval_reasons": [],
-            "denial_reasons": denial_reasons,
-            "policy_clauses_cited": policy.get("matched_clauses",[]),
-            "next_steps": ["Manual review required — contact insurer for further information"],
-            "appeal_pathway": f"Appeal to {req.insurance_provider} grievance cell within 30 days.",
-            "doctor_recommendation": "Await manual review before proceeding.",
-            "clinical_reasoning": f"Decision agent error — escalated for manual review. {e}"
-        }
-
-    # Persist to request
-    req.decision = result["decision"]
-    req.confidence_score = result["confidence"] / 100.0
-    req.approved_amount_inr = float(result.get("approved_amount_inr") or 0)
-    req.coverage_percentage = float(result.get("coverage_percentage") or 0)
-    req.approval_reasons = result.get("approval_reasons") or []
-    req.denial_reasons = result.get("denial_reasons") or []
-    req.policy_clauses_cited = result.get("policy_clauses_cited") or []
-    req.next_steps = result.get("next_steps") or []
-    req.appeal_pathway = result.get("appeal_pathway","")
-    req.doctor_recommendation = result.get("doctor_recommendation","")
+    # -- Persist results to PARequest ----------------------------------------
+    req.decision = evidence.decision
+    req.confidence_score = evidence.confidence.overall_confidence
+    req.approved_amount_inr = evidence.financial.approved_amount
+    req.coverage_percentage = evidence.policy.coverage_pct * 100
+    req.approval_reasons = evidence.approval_reasons
+    req.denial_reasons = evidence.denial_reasons
+    req.policy_clauses_cited = evidence.policy.matched_clauses
+    req.next_steps = evidence.next_steps
+    req.appeal_pathway = evidence.appeal_pathway
+    req.doctor_recommendation = evidence.doctor_recommendation
+    req.plain_english_summary = evidence.plain_english_summary
+    req.missing_information = evidence.missing_information
+    req.human_review_requested = evidence.human_review_required
+    req.human_review_reasons = evidence.human_review_reasons
+    req.decision_evidence = evidence.to_dict()
+    req.decision_trace = evidence.decision_trace.__dict__ if hasattr(evidence.decision_trace, '__dict__') else {}
     db.commit()
 
     dur = int((time.time()-t0)*1000)
-    dec = result["decision"].upper()
-    amt = result.get("approved_amount_inr",0)
+    dec = evidence.decision.upper()
+    amt = evidence.financial.approved_amount
     _save_run(db, req.id, "decision", "completed",
         output=f"DECISION: {dec}. "
-               + (f"Approved Amount: ₹{amt:,}. " if dec=="APPROVED" else "")
-               + f"Confidence: {result['confidence']}%. "
-               + f"{result.get('clinical_reasoning','')[:200]}",
-        details=result, confidence=result["confidence"]/100.0, duration_ms=dur)
-    ctx["decision"] = result
-    ctx["final_status"] = {"approved":"approved","denied":"rejected"}.get(result["decision"],"escalated")
+               + (f"Approved Amount: INR {amt:,.0f}. " if dec=="APPROVED" else "")
+               + f"Confidence: {evidence.confidence.overall_confidence:.0%}. "
+               + f"Rules evaluated: {len(evidence.validation_results)}.",
+        details={
+            "decision": evidence.decision,
+            "confidence": evidence.confidence.overall_confidence,
+            "confidence_level": evidence.confidence.confidence_level,
+            "rules_evaluated": len(evidence.validation_results),
+            "rules_passed": sum(1 for r in evidence.validation_results if r.passed),
+            "blocking_rules_failed": sum(1 for r in evidence.validation_results if not r.passed and r.severity == "critical"),
+            "human_review_required": evidence.human_review_required,
+            "missing_information": evidence.missing_information,
+            "approved_amount": evidence.financial.approved_amount,
+            "patient_responsibility": evidence.financial.patient_responsibility,
+        },
+        confidence=evidence.confidence.overall_confidence, duration_ms=dur)
+
+    status_map = {
+        "approved": "approved", "denied": "rejected",
+        "requires_information": "requires_information",
+        "human_review": "escalated", "partially_approved": "partially_approved",
+    }
+    ctx["decision"] = {
+        "decision": evidence.decision,
+        "confidence": evidence.confidence.overall_confidence * 100,
+        "approved_amount_inr": evidence.financial.approved_amount,
+        "coverage_percentage": evidence.policy.coverage_pct * 100,
+        "approval_reasons": evidence.approval_reasons,
+        "denial_reasons": evidence.denial_reasons,
+        "policy_clauses_cited": evidence.policy.matched_clauses,
+        "next_steps": evidence.next_steps,
+        "appeal_pathway": evidence.appeal_pathway,
+        "doctor_recommendation": evidence.doctor_recommendation,
+        "missing_information": evidence.missing_information,
+        "human_review_required": evidence.human_review_required,
+    }
+    ctx["evidence"] = evidence
+    ctx["final_status"] = status_map.get(evidence.decision, "escalated")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
