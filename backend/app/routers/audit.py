@@ -37,24 +37,21 @@ def list_audit_logs(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    if user.role not in ("insurer", "hospital"):
-        raise HTTPException(403, "Only insurers and hospitals can view audit logs")
-
-    q = db.query(AuditLog)
-
     if user.role == "hospital":
-        # Hospital users only see their own actions
-        q = q.filter(AuditLog.user_id == user.id)
+        raise HTTPException(403, "Hospital users cannot access the full audit log. Use the Request Timeline on each PA request instead.")
 
-    elif user.role == "insurer":
-        # Insurers only see logs for PA requests that match their company
+    if user.role == "insurer":
+        if not user.is_verified:
+            raise HTTPException(403, "Account pending verification")
         my_request_ids = db.query(PARequest.id).filter(
             PARequest.insurance_provider == user.company_name
         ).subquery()
-        q = q.filter(
+        q = db.query(AuditLog).filter(
             (AuditLog.resource_type == "pa_request") &
             (AuditLog.resource_id.in_(db.query(my_request_ids)))
         )
+    else:
+        q = db.query(AuditLog)
 
     if action:
         q = q.filter(AuditLog.action == action)

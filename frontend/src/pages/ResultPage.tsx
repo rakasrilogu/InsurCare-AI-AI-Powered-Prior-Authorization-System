@@ -845,24 +845,44 @@ export default function ResultPage() {
                 </div>
               )}
 
-              {/* Simplified Agent Pipeline — hospital only */}
-              {!isInsurer && req.agent_runs?.length > 0 && (
+              {/* Request Timeline — hospital only (user-friendly, no internal details) */}
+              {!isInsurer && (
                 <div className="bg-card rounded-2xl p-6 shadow-card">
                   <div className="flex items-center gap-2 mb-4">
                     <Clock className="w-5 h-5 text-secondary" />
-                    <h3 className="font-bold text-foreground">Agent Pipeline Status</h3>
+                    <h3 className="font-bold text-foreground">Request Timeline</h3>
                   </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {req.agent_runs.sort((a: any, b: any) => a.id - b.id).map((run: any) => (
-                      <div key={run.id} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${
-                        run.status==='completed'?'bg-success/10 text-success border border-success/20':
-                        run.status==='error'?'bg-destructive/10 text-destructive border border-destructive/20':
-                        'bg-muted text-muted-foreground border border-border'
-                      }`}>
-                        {run.status==='completed' ? '✓' : run.status==='error' ? '✗' : '…'}
-                        <span className="capitalize">{run.agent_id}</span>
+                  <div className="space-y-3">
+                    {[
+                      { label: 'Request Submitted', done: true, time: req.created_at },
+                      { label: 'Documents Uploaded', done: req.documents?.length > 0, time: req.created_at },
+                      { label: 'Documents Verified', done: req.documents?.some((d: any) => d.verification?.status === 'verified'), time: req.updated_at },
+                      { label: 'Processing Completed', done: ['approved','rejected','denied','escalated','partially_approved','appeal_submitted','appeal_rejected','appeal_approved','human_review','requires_information'].includes(req.status), time: req.updated_at },
+                      { label: 'Additional Information Requested', done: req.status === 'requires_information' || req.status === 'resubmitted', time: req.info_request_submitted_at },
+                      { label: 'Hospital Response Submitted', done: req.status === 'resubmitted', time: req.resubmitted_at },
+                      { label: 'Insurer Review', done: req.human_reviewed_at || req.decision, time: req.human_reviewed_at || req.updated_at },
+                      { label: 'Final Decision', done: ['approved','rejected','denied','partially_approved','appeal_rejected','appeal_approved'].includes(req.status), time: req.updated_at },
+                      { label: 'Payment Status', done: req.payment_status === 'paid', time: req.paid_at },
+                      { label: 'Appeal', done: !!req.appeal_status, time: req.appeal_submitted_at },
+                    ].filter(step => step.done).map((step, i) => (
+                      <div key={i} className="flex items-center gap-3">
+                        <div className="w-6 h-6 rounded-full bg-success/10 flex items-center justify-center shrink-0">
+                          <CheckCircle2 className="w-4 h-4 text-success" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-foreground">{step.label}</p>
+                          {step.time && <p className="text-xs text-muted-foreground">{new Date(step.time).toLocaleString()}</p>}
+                        </div>
                       </div>
                     ))}
+                    {!req.agent_runs?.length && !['approved','rejected','denied','escalated','partially_approved'].includes(req.status) && (
+                      <div className="flex items-center gap-3">
+                        <div className="w-6 h-6 rounded-full bg-secondary/10 flex items-center justify-center shrink-0">
+                          <Loader2 className="w-4 h-4 text-secondary animate-spin" />
+                        </div>
+                        <p className="text-sm text-muted-foreground">Processing in progress...</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

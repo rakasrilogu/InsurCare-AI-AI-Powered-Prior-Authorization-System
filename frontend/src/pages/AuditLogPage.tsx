@@ -9,6 +9,14 @@ const ACTION_ICONS: Record<string, typeof Shield> = {
   approve_payment: Shield,
   dispute: AlertTriangle,
   verify_documents: Shield,
+  request_info: AlertTriangle,
+  resubmit: FileText,
+  appeal: AlertTriangle,
+  review_appeal: Shield,
+  insurer_decision: Shield,
+  human_review: Shield,
+  approve: Shield,
+  deny: AlertTriangle,
 };
 
 const ACTION_COLORS: Record<string, string> = {
@@ -16,6 +24,14 @@ const ACTION_COLORS: Record<string, string> = {
   approve_payment: 'text-secondary',
   dispute: 'text-destructive',
   verify_documents: 'text-blue-500',
+  request_info: 'text-warning',
+  resubmit: 'text-blue-500',
+  appeal: 'text-orange-500',
+  review_appeal: 'text-secondary',
+  insurer_decision: 'text-secondary',
+  human_review: 'text-secondary',
+  approve: 'text-success',
+  deny: 'text-destructive',
 };
 
 export default function AuditLogPage() {
@@ -52,7 +68,7 @@ export default function AuditLogPage() {
 
         {/* Filters */}
         <div className="flex gap-2 flex-wrap">
-          {['', 'create', 'approve_payment', 'dispute', 'verify_documents'].map(action => (
+          {['', 'create', 'approve_payment', 'dispute', 'verify_documents', 'request_info', 'resubmit', 'appeal', 'review_appeal', 'insurer_decision', 'human_review'].map(action => (
             <button key={action} onClick={() => setFilter(action)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
                 filter === action
