@@ -139,6 +139,8 @@ export default function ResultPage() {
   const isDenied    = req.status === 'rejected' || req.status === 'denied';
   const isEscalated = req.status === 'escalated';
   const isProcessing = req.status === 'processing' || req.status === 'pending';
+  const requiresInfo = req.status === 'requires_information';
+  const partialApproval = req.status === 'partially_approved';
 
   const riskRun = req.agent_runs?.find((r: any) => r.agent_id === 'risk');
   const riskDetails = riskRun?.details || {};
@@ -429,9 +431,13 @@ export default function ResultPage() {
                   <div className="md:col-span-2 bg-success/5 rounded-2xl p-6 border border-success/20">
                     <div className="flex items-center gap-2 mb-4">
                       <IndianRupee className="w-5 h-5 text-success" />
-                      <h3 className="font-bold text-foreground">Coverage Breakdown</h3>
+                      <h3 className="font-bold text-foreground">Financial Assessment</h3>
                     </div>
-                    <div className="grid grid-cols-3 gap-4 text-center">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                      <div className="bg-white/60 rounded-xl p-4">
+                        <p className="text-xs text-muted-foreground mb-1">Procedure Cost</p>
+                        <p className="text-lg font-bold text-foreground">₹{Number(req.sum_insured || 0).toLocaleString('en-IN')}</p>
+                      </div>
                       <div className="bg-white/60 rounded-xl p-4">
                         <p className="text-xs text-muted-foreground mb-1">Approved Amount</p>
                         <p className="text-2xl font-black text-success">₹{Number(req.approved_amount_inr).toLocaleString('en-IN')}</p>
@@ -441,8 +447,8 @@ export default function ResultPage() {
                         <p className="text-2xl font-black text-foreground">{req.coverage_percentage}%</p>
                       </div>
                       <div className="bg-white/60 rounded-xl p-4">
-                        <p className="text-xs text-muted-foreground mb-1">Insurer</p>
-                        <p className="text-lg font-bold text-foreground">{req.insurance_provider}</p>
+                        <p className="text-xs text-muted-foreground mb-1">Patient Responsibility</p>
+                        <p className="text-lg font-bold text-warning">₹{Number((req.sum_insured || 0) - (req.approved_amount_inr || 0)).toLocaleString('en-IN')}</p>
                       </div>
                     </div>
                   </div>

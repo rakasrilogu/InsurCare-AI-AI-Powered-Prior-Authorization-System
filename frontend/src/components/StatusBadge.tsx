@@ -1,13 +1,16 @@
-type Status = 'pending' | 'processing' | 'approved' | 'denied' | 'rejected' | 'escalated' | 'review' | string;
+type Status = 'pending' | 'processing' | 'approved' | 'denied' | 'rejected' | 'escalated' | 'review' | 'requires_information' | 'partially_approved' | 'human_review' | string;
 
 const statusConfig: Record<string, { label: string; className: string; dot: string }> = {
-  pending:    { label: 'Pending',     className: 'bg-warning/10 text-warning border-warning/20',           dot: 'bg-warning' },
-  processing: { label: 'Processing',  className: 'bg-secondary/10 text-secondary border-secondary/20 animate-pulse', dot: 'bg-secondary' },
-  approved:   { label: 'Approved',    className: 'bg-success/10 text-success border-success/20',            dot: 'bg-success' },
-  denied:     { label: 'Denied',      className: 'bg-destructive/10 text-destructive border-destructive/20',dot: 'bg-destructive' },
-  rejected:   { label: 'Rejected',    className: 'bg-destructive/10 text-destructive border-destructive/20',dot: 'bg-destructive' },
-  escalated:  { label: 'Escalated',   className: 'bg-warning/10 text-warning border-warning/20',           dot: 'bg-warning' },
-  review:     { label: 'Needs Review',className: 'bg-warning/10 text-warning border-warning/20',           dot: 'bg-warning' },
+  pending:              { label: 'Pending',                className: 'bg-warning/10 text-warning border-warning/20',           dot: 'bg-warning' },
+  processing:           { label: 'Processing',             className: 'bg-secondary/10 text-secondary border-secondary/20 animate-pulse', dot: 'bg-secondary' },
+  approved:             { label: 'Approved',               className: 'bg-success/10 text-success border-success/20',            dot: 'bg-success' },
+  denied:               { label: 'Denied',                 className: 'bg-destructive/10 text-destructive border-destructive/20',dot: 'bg-destructive' },
+  rejected:             { label: 'Rejected',               className: 'bg-destructive/10 text-destructive border-destructive/20',dot: 'bg-destructive' },
+  escalated:            { label: 'Escalated',              className: 'bg-warning/10 text-warning border-warning/20',           dot: 'bg-warning' },
+  review:               { label: 'Needs Review',           className: 'bg-warning/10 text-warning border-warning/20',           dot: 'bg-warning' },
+  requires_information: { label: 'Info Required',          className: 'bg-orange-500/10 text-orange-600 border-orange-500/20',  dot: 'bg-orange-500' },
+  partially_approved:   { label: 'Partially Approved',     className: 'bg-blue-500/10 text-blue-600 border-blue-500/20',        dot: 'bg-blue-500' },
+  human_review:         { label: 'Human Review',           className: 'bg-warning/10 text-warning border-warning/20',           dot: 'bg-warning' },
 };
 
 const StatusBadge = ({ status }: { status: Status }) => {
