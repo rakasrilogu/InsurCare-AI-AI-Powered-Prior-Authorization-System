@@ -78,7 +78,8 @@ export default function ResultPage() {
       try {
         const data = await api.getRequest(id);
         setReq(data);
-        if (['approved', 'rejected', 'denied', 'escalated', 'partially_approved', 'appeal_submitted', 'appeal_rejected', 'appeal_approved'].includes(data.status)) {
+        if (['approved', 'rejected', 'denied', 'escalated', 'partially_approved', 'requires_information',
+             'appeal_submitted', 'appeal_rejected', 'appeal_approved', 'human_review'].includes(data.status)) {
           setPolling(false);
         }
       } catch (e) { console.error(e); }
@@ -235,9 +236,13 @@ export default function ResultPage() {
   const isApproved  = req.status === 'approved';
   const isDenied    = req.status === 'rejected' || req.status === 'denied';
   const isEscalated = req.status === 'escalated';
-  const isProcessing = req.status === 'processing' || req.status === 'pending';
+  const isProcessing = req.status === 'processing' || req.status === 'pending' || req.status === 'resubmitted';
   const requiresInfo = req.status === 'requires_information';
   const partialApproval = req.status === 'partially_approved';
+  const isTerminal = ['approved','rejected','denied','escalated','partially_approved',
+    'requires_information','appeal_submitted','appeal_rejected','appeal_approved'].includes(req.status);
+  const isReadyForReview = req.status !== 'processing' && req.status !== 'pending' && req.status !== 'resubmitted'
+    && !isTerminal && req.decision;
 
   const riskRun = req.agent_runs?.find((r: any) => r.agent_id === 'risk');
   const riskDetails = riskRun?.details || {};
