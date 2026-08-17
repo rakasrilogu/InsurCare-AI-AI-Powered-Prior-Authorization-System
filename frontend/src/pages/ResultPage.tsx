@@ -654,6 +654,38 @@ export default function ResultPage() {
                 </div>
               )}
 
+              {/* Decision Trace — insurer only */}
+              {isInsurer && req.decision_trace?.steps?.length > 0 && (
+                <div className="bg-card rounded-2xl p-6 shadow-card">
+                  <div className="flex items-center gap-2 mb-4">
+                    <ClipboardList className="w-5 h-5 text-secondary" />
+                    <h3 className="font-bold text-foreground">Decision Trace</h3>
+                    <span className="text-xs text-muted-foreground ml-auto">
+                      {req.decision_trace.total_duration_ms ? `${(req.decision_trace.total_duration_ms / 1000).toFixed(1)}s` : ''}
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {req.decision_trace.steps.map((step: any, i: number) => (
+                      <div key={i} className="flex items-start gap-3 py-2 border-b border-border/40 last:border-0">
+                        <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5 ${
+                          step.status === 'completed' ? 'bg-success/10 text-success' :
+                          step.status === 'error' ? 'bg-destructive/10 text-destructive' :
+                          'bg-muted text-muted-foreground'
+                        }`}>
+                          {step.status === 'completed' ? '✓' : step.status === 'error' ? '✗' : '…'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <span className="text-sm font-medium text-foreground">{step.step_name}</span>
+                          {step.output_data && (
+                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{step.output_data}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="flex gap-3 pt-2">
                 <Link to="/submit"><Button className="gradient-accent text-secondary-foreground border-0">New PA Request</Button></Link>
                 <Link to="/requests"><Button variant="outline">All Requests</Button></Link>
