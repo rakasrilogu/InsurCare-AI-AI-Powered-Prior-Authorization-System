@@ -262,33 +262,47 @@ export default function ResultPage() {
 
         {/* ── Processing State ── */}
         {isProcessing && (
-          <motion.div className="bg-card rounded-2xl p-10 shadow-card text-center"
+          <motion.div className="bg-card rounded-2xl p-10 shadow-card"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            <Loader2 className="w-12 h-12 animate-spin text-secondary mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-foreground mb-2">Processing Your Request</h2>
-            <p className="text-muted-foreground text-sm mb-6">6 AI agents are analysing your PA request. This takes ~60–90 seconds.</p>
-            <div ref={agentListRef} className="space-y-3 max-w-sm mx-auto text-left">
-              {['intake', 'eligibility', 'policy', 'risk', 'decision', 'communication', 'payment'].map((agentId) => {
-                const labels: Record<string, string> = {
-                  intake: 'Intake Agent (Haiku)', eligibility: 'Eligibility Agent (Sonnet)',
-                  policy: 'Policy Agent (Sonnet)', risk: 'Risk Agent (Sonnet)',
-                  decision: 'Decision Agent (Sonnet)', communication: 'Communication Agent (Haiku)',
-                  payment: 'Payment Agent',
-                };
-                const run = req.agent_runs?.find((r: any) => r.agent_id === agentId);
+            <div className="text-center mb-6">
+              <Loader2 className="w-12 h-12 animate-spin text-secondary mx-auto mb-4" />
+              <h2 className="text-xl font-bold text-foreground mb-2">Processing Your Request</h2>
+              <p className="text-muted-foreground text-sm">
+                {isInsurer ? 'AI pipeline is analysing the PA request.' : 'Your request is being processed by our AI system.'}
+              </p>
+            </div>
+            <div ref={agentListRef} className="space-y-3 max-w-md mx-auto">
+              {[
+                { id: 'intake', label: 'Intake Agent', desc: 'Validating request fields' },
+                { id: 'eligibility', label: 'Eligibility Agent', desc: 'Checking policy coverage' },
+                { id: 'policy', label: 'Policy Agent (RAG)', desc: 'Retrieving policy clauses' },
+                { id: 'risk', label: 'Evidence/Risk Processing', desc: 'Assessing clinical evidence' },
+                { id: 'decision', label: 'Decision Engine', desc: 'Deterministic rule-based evaluation' },
+                { id: 'communication', label: 'Communication Agent', desc: 'Preparing authorization' },
+                { id: 'payment', label: 'Payment Agent', desc: 'Processing payment workflow' },
+              ].map(({ id, label, desc }) => {
+                const run = req.agent_runs?.find((r: any) => r.agent_id === id);
                 const done = run?.status === 'completed';
                 const active = run?.status === 'active';
+                const failed = run?.status === 'error';
                 return (
-                  <div key={agentId} data-agent={agentId}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-all ${
+                  <div key={id} data-agent={id}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
                       active ? 'bg-secondary/10 ring-2 ring-secondary/30 scale-[1.02]' : ''
-                    }`}>
+                    } ${failed ? 'bg-destructive/5' : ''}`}>
                     {done ? <CheckCircle2 className="w-5 h-5 text-success shrink-0" />
+                          : failed ? <XCircle className="w-5 h-5 text-destructive shrink-0" />
                           : active ? <Loader2 className="w-5 h-5 text-secondary animate-spin shrink-0" />
                           : <div className="w-5 h-5 rounded-full border-2 border-border shrink-0" />}
-                    <span className={`text-sm ${done ? 'text-foreground' : active ? 'text-foreground font-semibold' : 'text-muted-foreground'}`}>{labels[agentId]}</span>
+                    <div className="flex-1 min-w-0">
+                      <span className={`text-sm ${done ? 'text-foreground' : active ? 'text-foreground font-semibold' : failed ? 'text-destructive' : 'text-muted-foreground'}`}>
+                        {label}
+                      </span>
+                      {isInsurer && <p className="text-xs text-muted-foreground">{desc}</p>}
+                    </div>
                     {done && run?.duration_ms && <span className="text-xs text-muted-foreground ml-auto">{(run.duration_ms/1000).toFixed(1)}s</span>}
                     {active && <span className="text-xs text-secondary font-semibold ml-auto animate-pulse">RUNNING</span>}
+                    {failed && <span className="text-xs text-destructive font-semibold ml-auto">FAILED</span>}
                   </div>
                 );
               })}
@@ -887,34 +901,71 @@ export default function ResultPage() {
                 </div>
               )}
 
-              {/* Decision Trace — insurer only */}
-              {isInsurer && req.decision_trace?.steps?.length > 0 && (
+              {/* Execution Trace — insurer only */}
+              {isInsurer && req.agent_runs?.length > 0 && (
                 <div className="bg-card rounded-2xl p-6 shadow-card">
                   <div className="flex items-center gap-2 mb-4">
                     <ClipboardList className="w-5 h-5 text-secondary" />
-                    <h3 className="font-bold text-foreground">Decision Trace</h3>
+                    <h3 className="font-bold text-foreground">Execution Trace</h3>
                     <span className="text-xs text-muted-foreground ml-auto">
-                      {req.decision_trace.total_duration_ms ? `${(req.decision_trace.total_duration_ms / 1000).toFixed(1)}s` : ''}
+                      Pipeline {req.status === 'processing' || req.status === 'pending' ? 'RUNNING' : 'COMPLETED'}
                     </span>
                   </div>
-                  <div className="space-y-2">
-                    {req.decision_trace.steps.map((step: any, i: number) => (
-                      <div key={i} className="flex items-start gap-3 py-2 border-b border-border/40 last:border-0">
-                        <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5 ${
-                          step.status === 'completed' ? 'bg-success/10 text-success' :
-                          step.status === 'error' ? 'bg-destructive/10 text-destructive' :
-                          'bg-muted text-muted-foreground'
-                        }`}>
-                          {step.status === 'completed' ? '✓' : step.status === 'error' ? '✗' : '…'}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <span className="text-sm font-medium text-foreground">{step.step_name}</span>
-                          {step.output_data && (
-                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{step.output_data}</p>
+                  <div className="space-y-1">
+                    {[
+                      { id: 'intake', label: 'Intake Agent', desc: 'Validating request fields' },
+                      { id: 'eligibility', label: 'Eligibility Agent', desc: 'Checking policy coverage' },
+                      { id: 'policy', label: 'Policy Agent (RAG)', desc: 'Retrieving policy clauses' },
+                      { id: 'risk', label: 'Evidence/Risk Processing', desc: 'Assessing clinical evidence' },
+                      { id: 'decision', label: 'Decision Engine', desc: 'Deterministic rule-based evaluation' },
+                      { id: 'communication', label: 'Communication Agent', desc: 'Preparing authorization' },
+                      { id: 'payment', label: 'Payment Agent', desc: 'Processing payment workflow' },
+                    ].map(({ id, label, desc }) => {
+                      const run = req.agent_runs?.find((r: any) => r.agent_id === id);
+                      const done = run?.status === 'completed';
+                      const active = run?.status === 'active';
+                      const failed = run?.status === 'error';
+                      const logs = run?.details?.logs || [];
+                      const [expanded, setExpanded] = useState(false);
+                      return (
+                        <div key={id} className="border border-border/40 rounded-xl overflow-hidden">
+                          <button onClick={() => setExpanded(!expanded)}
+                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors text-left">
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                              done ? 'bg-success/10 text-success' : failed ? 'bg-destructive/10 text-destructive' : active ? 'bg-secondary/10 text-secondary' : 'bg-muted text-muted-foreground'
+                            }`}>
+                              {done ? '✓' : failed ? '✗' : active ? '…' : '○'}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <span className={`text-sm font-medium ${done ? 'text-foreground' : active ? 'text-foreground font-semibold' : failed ? 'text-destructive' : 'text-muted-foreground'}`}>{label}</span>
+                              {isInsurer && <p className="text-xs text-muted-foreground">{desc}</p>}
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              {done && run?.duration_ms && <span className="text-xs text-muted-foreground">{(run.duration_ms/1000).toFixed(1)}s</span>}
+                              {run?.confidence != null && <span className="text-xs text-muted-foreground">{Math.round(run.confidence * 100)}%</span>}
+                              {active && <span className="text-xs text-secondary font-semibold animate-pulse">RUNNING</span>}
+                              {failed && <span className="text-xs text-destructive font-semibold">FAILED</span>}
+                              <span className="text-xs text-muted-foreground">{expanded ? '▲' : '▼'}</span>
+                            </div>
+                          </button>
+                          {expanded && logs.length > 0 && (
+                            <div className="px-4 pb-3 bg-muted/20 border-t border-border/30">
+                              {logs.map((log: any, i: number) => (
+                                <div key={i} className="flex items-start gap-2 py-1.5 text-xs font-mono">
+                                  <span className="text-muted-foreground shrink-0">{log.t ? new Date(log.t).toLocaleTimeString() : ''}</span>
+                                  <span className="text-foreground">{log.msg}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {expanded && logs.length === 0 && run?.output && (
+                            <div className="px-4 pb-3 bg-muted/20 border-t border-border/30">
+                              <p className="text-xs text-muted-foreground font-mono">{run.output}</p>
+                            </div>
                           )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
