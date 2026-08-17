@@ -252,4 +252,43 @@ export const api = {
 
   getDecisionTrace: (id: number | string) =>
     request<Record<string, unknown>>(`/api/requests/${id}/decision-trace`),
+
+  requestInfo: (id: number | string, message: string, missingDocuments: string[]) =>
+    requestValidated(PARequestSchema, `/api/requests/${id}/request-info`, {
+      method: "POST",
+      body: JSON.stringify({ message, missing_documents: missingDocuments }),
+    }),
+
+  resubmitRequest: (id: number | string) =>
+    requestValidated(PARequestSchema, `/api/requests/${id}/resubmit`, { method: "POST" }),
+
+  submitAppeal: (id: number | string, reason: string, explanation: string = "") =>
+    requestValidated(PARequestSchema, `/api/requests/${id}/appeal`, {
+      method: "POST",
+      body: JSON.stringify({ reason, additional_explanation: explanation }),
+    }),
+
+  reviewAppeal: (id: number | string, decision: string, notes: string = "") =>
+    requestValidated(PARequestSchema, `/api/requests/${id}/review-appeal`, {
+      method: "POST",
+      body: JSON.stringify({ decision, notes }),
+    }),
+
+  insurerDecision: (id: number | string, decision: string, reason: string = "", approvedAmount?: number) =>
+    requestValidated(PARequestSchema, `/api/requests/${id}/insurer-decision`, {
+      method: "POST",
+      body: JSON.stringify({ decision, reason, approved_amount_inr: approvedAmount }),
+    }),
+
+  listNotifications: (unreadOnly: boolean = false) =>
+    request<any[]>(`/api/notifications${unreadOnly ? '?unread_only=true' : ''}`),
+
+  unreadNotificationCount: () =>
+    request<{ count: number }>("/api/notifications/unread-count"),
+
+  markNotificationRead: (id: number) =>
+    request<any>(`/api/notifications/${id}/read`, { method: "POST" }),
+
+  markAllNotificationsRead: () =>
+    request<any>("/api/notifications/read-all", { method: "POST" }),
 };

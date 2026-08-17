@@ -403,3 +403,314 @@ def dispute_request(
                detail=f"Disputed claim: {body.reason[:200]}")
 
     return req
+
+
+# ── Request More Information ─────────────────────────────────────────────────
+
+class RequestInfoIn(BaseModel):
+    message: str
+    missing_documents: list[str] = []
+
+
+@router.post("/{request_id}/request-info", response_model=PARequestOut)
+def request_more_information(
+    request_id: int,
+    body: RequestInfoIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    if user.role != "insurer":
+        raise HTTPException(403, "Only insurers can request more information")
+    if not user.is_verified:
+        raise HTTPException(403, "Account pending verification")
+
+    req = db.get(PARequest, request_id)
+    if not req:
+        raise HTTPException(404, "Not found")
+    if req.insurance_provider != user.company_name:
+        raise HTTPException(403, "Access denied")
+
+    req.status = "requires_information"
+    req.info_request_message = body.message
+    req.info_request_details = body.missing_documents
+    req.info_request_submitted_at = datetime.now(timezone.utc)
+    req.human_review_requested = False
+    db.commit()
+    db.refresh(req)
+
+    log_action(db, user_id=user.id, user_email=user.email, user_role=user.role,
+               action="request_info", resource_type="pa_request", resource_id=req.id,
+               detail=f"Requested info: {body.message[:200]}. Missing: {', '.join(body.missing_documents)}")
+
+    from ..models.user import User as UserModel
+    from .notifications import create_notification
+    hospital_user = db.query(UserModel).filter(UserModel.id == req.user_id).first()
+    if hospital_user and hospital_user.hospital:
+        hospital_users = db.query(UserModel).filter(
+            UserModel.role == "hospital", UserModel.hospital == hospital_user.hospital,
+        ).all()
+        for h in hospital_users:
+            create_notification(db, h.id,
+                title="Additional Information Requested",
+                message=f"Insurer requested information for {req.request_code}: {body.message[:200]}",
+                notification_type="info_requested", request_id=req.id)
+    db.commit()
+    return req
+
+
+# ── Resubmit (Hospital responds to info request) ─────────────────────────────
+
+@router.post("/{request_id}/resubmit", response_model=PARequestOut)
+def resubmit_request(
+    request_id: int,
+    bg: BackgroundTasks,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    if user.role != "hospital" or not user.can_submit:
+        raise HTTPException(403, "Only hospital users with submit permission can resubmit")
+
+    req = db.get(PARequest, request_id)
+    if not req:
+        raise HTTPException(404, "Not found")
+
+    if user.hospital:
+        hospital_user_ids = [
+            u.id for u in db.query(User).filter(
+                User.role == "hospital", User.hospital == user.hospital
+            ).all()
+        ]
+        if req.user_id not in hospital_user_ids:
+            raise HTTPException(403, "Access denied")
+    else:
+        raise HTTPException(403, "Access denied")
+
+    if req.status != "requires_information":
+        raise HTTPException(400, "Request is not in requires_information status")
+
+    req.status = "resubmitted"
+    req.resubmitted_at = datetime.now(timezone.utc)
+    req.info_request_message = None
+    req.info_request_details = []
+    db.commit()
+    db.refresh(req)
+
+    log_action(db, user_id=user.id, user_email=user.email, user_role=user.role,
+               action="resubmit", resource_type="pa_request", resource_id=req.id,
+               detail=f"Resubmitted PA request {req.request_code}")
+
+    bg.add_task(_process_in_bg, req.id)
+
+    from ..models.user import User as UserModel
+    from .notifications import create_notification
+    insurer_users = db.query(UserModel).filter(
+        UserModel.role == "insurer", UserModel.company_name == req.insurance_provider,
+    ).all()
+    for ins in insurer_users:
+        create_notification(db, ins.id,
+            title="Request Resubmitted",
+            message=f"Hospital resubmitted {req.request_code} with additional information.",
+            notification_type="decision", request_id=req.id)
+    db.commit()
+    return req
+
+
+# ── Appeal ───────────────────────────────────────────────────────────────────
+
+class AppealIn(BaseModel):
+    reason: str
+    additional_explanation: str = ""
+
+
+@router.post("/{request_id}/appeal", response_model=PARequestOut)
+def submit_appeal(
+    request_id: int,
+    body: AppealIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    if user.role != "hospital" or not user.can_submit:
+        raise HTTPException(403, "Only hospital users with submit permission can appeal")
+
+    req = db.get(PARequest, request_id)
+    if not req:
+        raise HTTPException(404, "Not found")
+
+    if user.hospital:
+        hospital_user_ids = [
+            u.id for u in db.query(User).filter(
+                User.role == "hospital", User.hospital == user.hospital
+            ).all()
+        ]
+        if req.user_id not in hospital_user_ids:
+            raise HTTPException(403, "Access denied")
+    else:
+        raise HTTPException(403, "Access denied")
+
+    if req.status not in ("rejected", "denied"):
+        raise HTTPException(400, "Can only appeal denied requests")
+
+    req.appeal_status = "submitted"
+    req.appeal_reason = body.reason
+    req.appeal_additional_explanation = body.additional_explanation
+    req.appeal_submitted_at = datetime.now(timezone.utc)
+    req.status = "appeal_submitted"
+    db.commit()
+    db.refresh(req)
+
+    log_action(db, user_id=user.id, user_email=user.email, user_role=user.role,
+               action="appeal", resource_type="pa_request", resource_id=req.id,
+               detail=f"Appeal submitted: {body.reason[:200]}")
+
+    from ..models.user import User as UserModel
+    from .notifications import create_notification
+    insurer_users = db.query(UserModel).filter(
+        UserModel.role == "insurer", UserModel.company_name == req.insurance_provider,
+    ).all()
+    for ins in insurer_users:
+        create_notification(db, ins.id,
+            title="Appeal Submitted",
+            message=f"Appeal for {req.request_code}: {body.reason[:200]}",
+            notification_type="appeal", request_id=req.id)
+    db.commit()
+    return req
+
+
+# ── Review Appeal (Insurer) ─────────────────────────────────────────────────
+
+class AppealReviewIn(BaseModel):
+    decision: str  # appeal_approved | appeal_rejected
+    notes: str = ""
+
+
+@router.post("/{request_id}/review-appeal", response_model=PARequestOut)
+def review_appeal(
+    request_id: int,
+    body: AppealReviewIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    if user.role != "insurer":
+        raise HTTPException(403, "Only insurers can review appeals")
+    if not user.is_verified:
+        raise HTTPException(403, "Account pending verification")
+
+    req = db.get(PARequest, request_id)
+    if not req:
+        raise HTTPException(404, "Not found")
+    if req.insurance_provider != user.company_name:
+        raise HTTPException(403, "Access denied")
+
+    if req.appeal_status != "submitted":
+        raise HTTPException(400, "No pending appeal for this request")
+
+    valid = {"appeal_approved", "appeal_rejected"}
+    if body.decision not in valid:
+        raise HTTPException(400, f"Decision must be one of: {', '.join(valid)}")
+
+    req.appeal_status = body.decision.replace("appeal_", "")
+    req.appeal_reviewer_id = user.id
+    req.appeal_reviewer_notes = body.notes
+    req.appeal_reviewed_at = datetime.now(timezone.utc)
+
+    if body.decision == "appeal_approved":
+        req.status = "approved"
+        req.decision = "approved"
+    else:
+        req.status = "appeal_rejected"
+
+    db.commit()
+    db.refresh(req)
+
+    log_action(db, user_id=user.id, user_email=user.email, user_role=user.role,
+               action="review_appeal", resource_type="pa_request", resource_id=req.id,
+               detail=f"Appeal {body.decision}: {body.notes[:200]}")
+
+    from ..models.user import User as UserModel
+    from .notifications import create_notification
+    hospital_user = db.query(UserModel).filter(UserModel.id == req.user_id).first()
+    if hospital_user and hospital_user.hospital:
+        hospital_users = db.query(UserModel).filter(
+            UserModel.role == "hospital", UserModel.hospital == hospital_user.hospital,
+        ).all()
+        for h in hospital_users:
+            create_notification(db, h.id,
+                title=f"Appeal {body.decision.replace('appeal_', '').title()}",
+                message=f"Your appeal for {req.request_code} has been {body.decision.replace('appeal_', '')}.",
+                notification_type="appeal", request_id=req.id)
+    db.commit()
+    return req
+
+
+# ── Insurer Decision (Approve/Deny/Partial) ─────────────────────────────────
+
+class InsurerDecisionIn(BaseModel):
+    decision: str  # approved | denied | partially_approved
+    reason: str = ""
+    approved_amount_inr: float | None = None
+
+
+@router.post("/{request_id}/insurer-decision", response_model=PARequestOut)
+def insurer_decision(
+    request_id: int,
+    body: InsurerDecisionIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    if user.role != "insurer":
+        raise HTTPException(403, "Only insurers can make decisions")
+    if not user.is_verified:
+        raise HTTPException(403, "Account pending verification")
+
+    req = db.get(PARequest, request_id)
+    if not req:
+        raise HTTPException(404, "Not found")
+    if req.insurance_provider != user.company_name:
+        raise HTTPException(403, "Access denied")
+
+    valid = {"approved", "denied", "partially_approved"}
+    if body.decision not in valid:
+        raise HTTPException(400, f"Decision must be one of: {', '.join(valid)}")
+
+    req.decision = body.decision
+    req.human_reviewer_id = user.id
+    req.human_review_notes = body.reason
+    req.human_review_decision = body.decision
+    req.human_reviewed_at = datetime.now(timezone.utc)
+    req.human_review_requested = False
+
+    if body.decision == "approved":
+        req.status = "approved"
+        req.approval_reasons = [body.reason] if body.reason else req.approval_reasons
+        req.payment_status = "pending_insurer_approval"
+    elif body.decision == "denied":
+        req.status = "rejected"
+        req.denial_reasons = [body.reason] if body.reason else req.denial_reasons
+    elif body.decision == "partially_approved":
+        req.status = "partially_approved"
+        if body.approved_amount_inr is not None:
+            req.approved_amount_inr = body.approved_amount_inr
+        req.approval_reasons = [body.reason] if body.reason else req.approval_reasons
+        req.payment_status = "pending_insurer_approval"
+
+    db.commit()
+    db.refresh(req)
+
+    log_action(db, user_id=user.id, user_email=user.email, user_role=user.role,
+               action="insurer_decision", resource_type="pa_request", resource_id=req.id,
+               detail=f"Insurer decision: {body.decision}. Reason: {body.reason[:200]}")
+
+    from ..models.user import User as UserModel
+    from .notifications import create_notification
+    hospital_user = db.query(UserModel).filter(UserModel.id == req.user_id).first()
+    if hospital_user and hospital_user.hospital:
+        hospital_users = db.query(UserModel).filter(
+            UserModel.role == "hospital", UserModel.hospital == hospital_user.hospital,
+        ).all()
+        for h in hospital_users:
+            create_notification(db, h.id,
+                title=f"PA Request {body.decision.replace('_', ' ').title()}",
+                message=f"Your PA request {req.request_code} has been {body.decision.replace('_', ' ')}.",
+                notification_type="decision", request_id=req.id)
+    db.commit()
+    return req

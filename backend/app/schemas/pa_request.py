@@ -98,6 +98,21 @@ class PARequestOut(BaseModel):
     disputed: bool = False
     dispute_reason: str | None = None
 
+    # Appeal
+    appeal_status: str | None = None
+    appeal_reason: str | None = None
+    appeal_additional_explanation: str | None = None
+    appeal_submitted_at: datetime | None = None
+    appeal_reviewed_at: datetime | None = None
+    appeal_reviewer_id: int | None = None
+    appeal_reviewer_notes: str | None = None
+
+    # Information request
+    info_request_message: str | None = None
+    info_request_details: list[str] = []
+    info_request_submitted_at: datetime | None = None
+    resubmitted_at: datetime | None = None
+
     created_at: datetime
     updated_at: datetime
     agent_runs: list[AgentRunOut] = []

@@ -76,6 +76,21 @@ class PARequest(Base):
     disputed = Column(Boolean, default=False, nullable=False)
     dispute_reason = Column(Text, nullable=True)
 
+    # Appeal
+    appeal_status = Column(String(50), nullable=True)  # submitted|under_review|approved|rejected
+    appeal_reason = Column(Text, nullable=True)
+    appeal_additional_explanation = Column(Text, nullable=True)
+    appeal_submitted_at = Column(DateTime(timezone=True), nullable=True)
+    appeal_reviewed_at = Column(DateTime(timezone=True), nullable=True)
+    appeal_reviewer_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    appeal_reviewer_notes = Column(Text, nullable=True)
+
+    # Information request
+    info_request_message = Column(Text, nullable=True)
+    info_request_details = Column(JSON, default=list)
+    info_request_submitted_at = Column(DateTime(timezone=True), nullable=True)
+    resubmitted_at = Column(DateTime(timezone=True), nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
