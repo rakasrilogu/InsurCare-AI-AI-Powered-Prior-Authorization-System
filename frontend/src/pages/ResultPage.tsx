@@ -55,6 +55,22 @@ export default function ResultPage() {
   const [disputeText, setDisputeText] = useState('');
   const [disputing, setDisputing] = useState(false);
   const [disputeError, setDisputeError] = useState<string | null>(null);
+  // Insurer action state
+  const [showInsurerDecision, setShowInsurerDecision] = useState(false);
+  const [insurerDecision, setInsurerDecision] = useState('');
+  const [insurerReason, setInsurerReason] = useState('');
+  const [insurerAmount, setInsurerAmount] = useState('');
+  const [submittingDecision, setSubmittingDecision] = useState(false);
+  const [showRequestInfo, setShowRequestInfo] = useState(false);
+  const [infoMessage, setInfoMessage] = useState('');
+  const [infoDocuments, setInfoDocuments] = useState('');
+  const [submittingInfo, setSubmittingInfo] = useState(false);
+  // Hospital appeal state
+  const [showAppealForm, setShowAppealForm] = useState(false);
+  const [appealReason, setAppealReason] = useState('');
+  const [appealExplanation, setAppealExplanation] = useState('');
+  const [submittingAppeal, setSubmittingAppeal] = useState(false);
+  const [showResubmit, setShowResubmit] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -62,7 +78,7 @@ export default function ResultPage() {
       try {
         const data = await api.getRequest(id);
         setReq(data);
-        if (['approved', 'rejected', 'escalated'].includes(data.status)) {
+        if (['approved', 'rejected', 'denied', 'escalated', 'partially_approved', 'appeal_submitted', 'appeal_rejected', 'appeal_approved'].includes(data.status)) {
           setPolling(false);
         }
       } catch (e) { console.error(e); }
@@ -114,6 +130,87 @@ export default function ResultPage() {
       setDisputeError(msg);
     } finally {
       setDisputing(false);
+    }
+  };
+
+  const handleInsurerDecision = async () => {
+    if (!insurerDecision) return;
+    setSubmittingDecision(true);
+    try {
+      const amt = insurerAmount ? parseFloat(insurerAmount) : undefined;
+      const updated = await api.insurerDecision(id!, insurerDecision, insurerReason, amt);
+      setReq(updated);
+      setShowInsurerDecision(false);
+      setInsurerDecision('');
+      setInsurerReason('');
+      setInsurerAmount('');
+      toast({ title: 'Decision submitted', description: `Request ${insurerDecision.replace('_', ' ')}.` });
+    } catch (e: any) {
+      toast({ title: 'Error', description: e?.body?.detail || e?.message || 'Failed', variant: 'destructive' });
+    } finally {
+      setSubmittingDecision(false);
+    }
+  };
+
+  const handleRequestInfo = async () => {
+    if (!infoMessage.trim()) return;
+    setSubmittingInfo(true);
+    try {
+      const docs = infoDocuments.split(',').map(d => d.trim()).filter(Boolean);
+      const updated = await api.requestInfo(id!, infoMessage.trim(), docs);
+      setReq(updated);
+      setShowRequestInfo(false);
+      setInfoMessage('');
+      setInfoDocuments('');
+      toast({ title: 'Information requested', description: 'Hospital has been notified.' });
+    } catch (e: any) {
+      toast({ title: 'Error', description: e?.body?.detail || e?.message || 'Failed', variant: 'destructive' });
+    } finally {
+      setSubmittingInfo(false);
+    }
+  };
+
+  const handleResubmit = async () => {
+    setSubmittingDecision(true);
+    try {
+      const updated = await api.resubmitRequest(id!);
+      setReq(updated);
+      setShowResubmit(false);
+      toast({ title: 'Resubmitted', description: 'Request is back in processing.' });
+    } catch (e: any) {
+      toast({ title: 'Error', description: e?.body?.detail || e?.message || 'Failed', variant: 'destructive' });
+    } finally {
+      setSubmittingDecision(false);
+    }
+  };
+
+  const handleAppeal = async () => {
+    if (!appealReason.trim()) return;
+    setSubmittingAppeal(true);
+    try {
+      const updated = await api.submitAppeal(id!, appealReason.trim(), appealExplanation.trim());
+      setReq(updated);
+      setShowAppealForm(false);
+      setAppealReason('');
+      setAppealExplanation('');
+      toast({ title: 'Appeal submitted', description: 'Insurer has been notified.' });
+    } catch (e: any) {
+      toast({ title: 'Error', description: e?.body?.detail || e?.message || 'Failed', variant: 'destructive' });
+    } finally {
+      setSubmittingAppeal(false);
+    }
+  };
+
+  const handleReviewAppeal = async (decision: string) => {
+    setSubmittingDecision(true);
+    try {
+      const updated = await api.reviewAppeal(id!, decision, `Appeal ${decision.replace('appeal_', '')}`);
+      setReq(updated);
+      toast({ title: 'Appeal reviewed', description: `Appeal ${decision.replace('appeal_', '')}.` });
+    } catch (e: any) {
+      toast({ title: 'Error', description: e?.body?.detail || e?.message || 'Failed', variant: 'destructive' });
+    } finally {
+      setSubmittingDecision(false);
     }
   };
 
@@ -558,6 +655,116 @@ export default function ResultPage() {
                 )}
 
               </div>
+
+              {/* ── Insurer Action Panel ── */}
+              {isInsurer && !showDisputeForm && !req.disputed && (req.status === 'human_review' || req.status === 'escalated' || req.status === 'pending' || req.status === 'resubmitted' || req.status === 'processing') && (
+                <div className="bg-card rounded-2xl p-6 shadow-card mt-6 border border-border/50">
+                  <div className="flex items-center gap-2 mb-4">
+                    <ShieldCheck className="w-5 h-5 text-secondary" />
+                    <h3 className="font-bold text-foreground">Insurer Decision</h3>
+                  </div>
+                  {!showInsurerDecision ? (
+                    <div className="flex gap-2 flex-wrap">
+                      <Button size="sm" className="bg-success text-white hover:bg-success/90" onClick={() => { setShowInsurerDecision(true); setInsurerDecision('approved'); }}>Approve</Button>
+                      <Button size="sm" className="bg-destructive text-white hover:bg-destructive/90" onClick={() => { setShowInsurerDecision(true); setInsurerDecision('denied'); }}>Deny</Button>
+                      <Button size="sm" variant="outline" onClick={() => { setShowInsurerDecision(true); setInsurerDecision('partially_approved'); }}>Partial Approve</Button>
+                      <Button size="sm" variant="outline" onClick={() => setShowRequestInfo(true)}><AlertCircle className="w-4 h-4 mr-1" />Request Info</Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-sm font-medium text-foreground">Decision: <span className={insurerDecision === 'approved' ? 'text-success' : insurerDecision === 'denied' ? 'text-destructive' : 'text-blue-600'}>{insurerDecision.replace('_', ' ').toUpperCase()}</span></p>
+                      <textarea className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm min-h-[60px] resize-none" placeholder="Reason for decision..." value={insurerReason} onChange={e => setInsurerReason(e.target.value)} />
+                      {insurerDecision === 'partially_approved' && (
+                        <input className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" type="number" placeholder="Approved amount (INR)" value={insurerAmount} onChange={e => setInsurerAmount(e.target.value)} />
+                      )}
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={handleInsurerDecision} disabled={submittingDecision}>{submittingDecision ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}Submit</Button>
+                        <Button size="sm" variant="outline" onClick={() => { setShowInsurerDecision(false); setInsurerDecision(''); setInsurerReason(''); }}>Cancel</Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Request More Information (Insurer) ── */}
+              {isInsurer && showRequestInfo && (
+                <div className="bg-card rounded-2xl p-6 shadow-card mt-6 border border-border/50">
+                  <div className="flex items-center gap-2 mb-4">
+                    <AlertCircle className="w-5 h-5 text-warning" />
+                    <h3 className="font-bold text-foreground">Request More Information</h3>
+                  </div>
+                  <div className="space-y-3">
+                    <textarea className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm min-h-[60px] resize-none" placeholder="What information is needed?" value={infoMessage} onChange={e => setInfoMessage(e.target.value)} />
+                    <input className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" placeholder="Missing documents (comma-separated, e.g. Diagnostic Report, Lab Results)" value={infoDocuments} onChange={e => setInfoDocuments(e.target.value)} />
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={handleRequestInfo} disabled={submittingInfo}>{submittingInfo ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}Send Request</Button>
+                      <Button size="sm" variant="outline" onClick={() => { setShowRequestInfo(false); setInfoMessage(''); setInfoDocuments(''); }}>Cancel</Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Appeal Form (Hospital) ── */}
+              {!isInsurer && (isDenied || req.status === 'rejected') && !req.appeal_status && (
+                <div className="bg-card rounded-2xl p-6 shadow-card mt-6 border border-border/50">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Phone className="w-5 h-5 text-secondary" />
+                    <h3 className="font-bold text-foreground">Appeal Decision</h3>
+                  </div>
+                  {!showAppealForm ? (
+                    <Button size="sm" variant="outline" onClick={() => setShowAppealForm(true)}>Submit Appeal</Button>
+                  ) : (
+                    <div className="space-y-3">
+                      <textarea className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm min-h-[60px] resize-none" placeholder="Reason for appeal..." value={appealReason} onChange={e => setAppealReason(e.target.value)} />
+                      <textarea className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm min-h-[40px] resize-none" placeholder="Additional explanation (optional)..." value={appealExplanation} onChange={e => setAppealExplanation(e.target.value)} />
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={handleAppeal} disabled={submittingAppeal}>{submittingAppeal ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}Submit Appeal</Button>
+                        <Button size="sm" variant="outline" onClick={() => { setShowAppealForm(false); setAppealReason(''); setAppealExplanation(''); }}>Cancel</Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Appeal Status (Hospital) ── */}
+              {!isInsurer && req.appeal_status && (
+                <div className="bg-card rounded-2xl p-6 shadow-card mt-6 border border-border/50">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Phone className="w-5 h-5 text-secondary" />
+                    <h3 className="font-bold text-foreground">Appeal Status</h3>
+                    <StatusBadge status={`appeal_${req.appeal_status}`} />
+                  </div>
+                  {req.appeal_reason && <p className="text-sm text-muted-foreground"><strong>Reason:</strong> {req.appeal_reason}</p>}
+                  {req.appeal_reviewer_notes && <p className="text-sm text-muted-foreground mt-2"><strong>Reviewer Notes:</strong> {req.appeal_reviewer_notes}</p>}
+                </div>
+              )}
+
+              {/* ── Appeal Review (Insurer) ── */}
+              {isInsurer && req.appeal_status === 'submitted' && (
+                <div className="bg-card rounded-2xl p-6 shadow-card mt-6 border border-border/50">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Phone className="w-5 h-5 text-secondary" />
+                    <h3 className="font-bold text-foreground">Review Appeal</h3>
+                    <StatusBadge status="appeal_submitted" />
+                  </div>
+                  {req.appeal_reason && <p className="text-sm text-muted-foreground mb-2"><strong>Reason:</strong> {req.appeal_reason}</p>}
+                  {req.appeal_additional_explanation && <p className="text-sm text-muted-foreground mb-4"><strong>Explanation:</strong> {req.appeal_additional_explanation}</p>}
+                  <div className="flex gap-2">
+                    <Button size="sm" className="bg-success text-white hover:bg-success/90" onClick={() => handleReviewAppeal('appeal_approved')} disabled={submittingDecision}>Approve Appeal</Button>
+                    <Button size="sm" className="bg-destructive text-white hover:bg-destructive/90" onClick={() => handleReviewAppeal('appeal_rejected')} disabled={submittingDecision}>Reject Appeal</Button>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Resubmit Button (Hospital, requires_information) ── */}
+              {!isInsurer && req.status === 'requires_information' && (
+                <div className="mt-6">
+                  <Button className="gradient-accent text-secondary-foreground border-0 gap-2" onClick={handleResubmit} disabled={submittingDecision}>
+                    {submittingDecision ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
+                    Resubmit for Processing
+                  </Button>
+                </div>
+              )}
 
               {/* Missing Information — when requires_information */}
               {req.status === 'requires_information' && req.missing_information?.length > 0 && (
