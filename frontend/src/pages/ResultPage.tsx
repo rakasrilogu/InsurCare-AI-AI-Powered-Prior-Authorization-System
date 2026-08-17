@@ -532,16 +532,16 @@ export default function ResultPage() {
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
                       <div className="bg-white/60 rounded-xl p-4">
-                        <p className="text-xs text-muted-foreground mb-1">Procedure Cost</p>
+                        <p className="text-xs text-muted-foreground mb-1">Requested / Procedure Cost</p>
                         <p className="text-lg font-bold text-foreground">₹{Number(req.sum_insured || 0).toLocaleString('en-IN')}</p>
                       </div>
                       <div className="bg-white/60 rounded-xl p-4">
                         <p className="text-xs text-muted-foreground mb-1">Approved Amount</p>
-                        <p className="text-2xl font-black text-success">₹{Number(req.approved_amount_inr).toLocaleString('en-IN')}</p>
+                        <p className="text-2xl font-black text-success">₹{Number(req.approved_amount_inr || 0).toLocaleString('en-IN')}</p>
                       </div>
                       <div className="bg-white/60 rounded-xl p-4">
                         <p className="text-xs text-muted-foreground mb-1">Coverage</p>
-                        <p className="text-2xl font-black text-foreground">{req.coverage_percentage}%</p>
+                        <p className="text-2xl font-black text-foreground">{req.coverage_percentage || 0}%</p>
                       </div>
                       <div className="bg-white/60 rounded-xl p-4">
                         <p className="text-xs text-muted-foreground mb-1">Patient Responsibility</p>

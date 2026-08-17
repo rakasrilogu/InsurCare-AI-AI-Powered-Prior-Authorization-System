@@ -66,6 +66,13 @@ export default function DashboardPage() {
   const pendingPayment = requests.filter(r => r.payment_status === 'pending_insurer_approval').length;
   const disputed = requests.filter(r => r.disputed).length;
   const appeals = requests.filter(r => r.appeal_status === 'submitted').length;
+  const completedRequests = requests.filter(r => r.created_at && r.updated_at);
+  const avgProcessingTime = completedRequests.length > 0
+    ? Math.round(completedRequests.reduce((sum, r) => {
+        const diff = (new Date(r.updated_at).getTime() - new Date(r.created_at).getTime()) / 1000;
+        return sum + diff;
+      }, 0) / completedRequests.length)
+    : 0;
 
   // Hospital: Action Required items
   const actionRequired = requests.filter(r =>
@@ -144,7 +151,7 @@ export default function DashboardPage() {
                   {requiresInfo > 0 && <StatCard title="Info Required" value={requiresInfo} icon={AlertCircle} />}
                   {escalated > 0 && <StatCard title="In Review" value={escalated} icon={AlertTriangle} />}
                   <StatCard title="Approval Rate" value={`${approvalRate}%`} icon={TrendingUp} variant="success" />
-                  <StatCard title="Avg Processing" value="~90s" icon={Clock} variant="accent" subtitle="6 AI agents" />
+                  <StatCard title="Avg Processing" value={avgProcessingTime > 0 ? `${avgProcessingTime}s` : '—'} icon={Clock} variant="accent" subtitle="from completed requests" />
                 </div>
 
                 {/* Action Required */}
