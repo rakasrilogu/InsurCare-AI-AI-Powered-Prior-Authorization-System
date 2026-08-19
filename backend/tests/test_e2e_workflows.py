@@ -18,14 +18,16 @@ def _db():
 
 @pytest.fixture(scope="module")
 def hospital_user(client):
+    import time
+    ts = int(time.time())
     r = client.post("/api/auth/signup", json={
-        "email": "e2e-hospital@test.com", "password": "test1234",
+        "email": f"e2e-hospital-{ts}@test.com", "password": "test1234",
         "confirm_password": "test1234", "full_name": "E2E Hospital",
         "role": "hospital", "hospital": "E2E Hospital", "can_submit": True,
     })
     token = r.json()["access_token"]
     db = _db()
-    u = db.query(User).filter(User.email == "e2e-hospital@test.com").first()
+    u = db.query(User).filter(User.email == f"e2e-hospital-{ts}@test.com").first()
     if u:
         u.hospital = "E2E Hospital"
         db.commit()
@@ -35,14 +37,16 @@ def hospital_user(client):
 
 @pytest.fixture(scope="module")
 def insurer_user(client):
+    import time
+    ts = int(time.time())
     r = client.post("/api/auth/signup", json={
-        "email": "e2e-insurer@test.com", "password": "test1234",
+        "email": f"e2e-insurer-{ts}@test.com", "password": "test1234",
         "confirm_password": "test1234", "full_name": "E2E Insurer",
         "role": "insurer", "company_name": "Star Health",
     })
     token = r.json()["access_token"]
     db = _db()
-    u = db.query(User).filter(User.email == "e2e-insurer@test.com").first()
+    u = db.query(User).filter(User.email == f"e2e-insurer-{ts}@test.com").first()
     if u:
         u.is_verified = True
         db.commit()

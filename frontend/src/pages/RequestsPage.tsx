@@ -6,6 +6,7 @@ import StatusBadge from '@/components/StatusBadge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 
 const STATUSES = ['all', 'pending', 'processing', 'approved', 'rejected', 'escalated'];
 
@@ -14,6 +15,7 @@ export default function RequestsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const { isInsurer } = useAuth();
 
   const load = () => {
     setLoading(true);
@@ -126,7 +128,7 @@ export default function RequestsPage() {
                         <Link to={`/request/${req.id}`} className="inline-flex items-center gap-1 text-xs text-secondary font-medium hover:underline">
                           <Eye className="w-3.5 h-3.5" /> View
                         </Link>
-                        {req.status === 'processing' && (
+                        {isInsurer && req.status === 'processing' && (
                           <Link to={`/pipeline/${req.id}`} className="inline-flex items-center gap-1 text-xs text-warning font-medium hover:underline">
                             Live
                           </Link>

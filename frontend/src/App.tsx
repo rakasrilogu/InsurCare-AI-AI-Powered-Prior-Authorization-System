@@ -33,13 +33,14 @@ const App = () => (
             <Route path="/dashboard"     element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
             {/* Users with submit permission */}
             <Route path="/submit"        element={<ProtectedRoute submitOnly><SubmitRequestPage /></ProtectedRoute>} />
+            {/* Insurer-only: live pipeline and agent tracking */}
+            <Route path="/pipeline/:id"  element={<ProtectedRoute insurerOnly><PipelinePage /></ProtectedRoute>} />
+            <Route path="/agent-tracking"        element={<ProtectedRoute insurerOnly><AgentTrackingPage /></ProtectedRoute>} />
+            <Route path="/agent-tracking/:id"    element={<ProtectedRoute insurerOnly><AgentTrackingPage /></ProtectedRoute>} />
             {/* All roles */}
-            <Route path="/pipeline/:id"  element={<ProtectedRoute><PipelinePage /></ProtectedRoute>} />
             <Route path="/result/:id"    element={<ProtectedRoute><ResultPage /></ProtectedRoute>} />
             <Route path="/request/:id"   element={<ProtectedRoute><ResultPage /></ProtectedRoute>} />
             <Route path="/requests"      element={<ProtectedRoute><RequestsPage /></ProtectedRoute>} />
-            <Route path="/agent-tracking"        element={<ProtectedRoute><AgentTrackingPage /></ProtectedRoute>} />
-            <Route path="/agent-tracking/:id"    element={<ProtectedRoute><AgentTrackingPage /></ProtectedRoute>} />
             <Route path="/analytics"     element={<ProtectedRoute><AnalyticsPage /></ProtectedRoute>} />
             <Route path="/chat"          element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
             <Route path="/audit"         element={<ProtectedRoute><AuditLogPage /></ProtectedRoute>} />
