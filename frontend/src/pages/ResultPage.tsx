@@ -71,6 +71,7 @@ export default function ResultPage() {
   const [appealExplanation, setAppealExplanation] = useState('');
   const [submittingAppeal, setSubmittingAppeal] = useState(false);
   const [showResubmit, setShowResubmit] = useState(false);
+  const [expandedStages, setExpandedStages] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!id) return;
@@ -931,10 +932,11 @@ export default function ResultPage() {
                       const active = run?.status === 'active';
                       const failed = run?.status === 'error';
                       const logs = run?.details?.logs || [];
-                      const [expanded, setExpanded] = useState(false);
+                      const stageKey = `expanded_${id}`;
+                      const isExpanded = expandedStages[stageKey] || false;
                       return (
                         <div key={id} className="border border-border/40 rounded-xl overflow-hidden">
-                          <button onClick={() => setExpanded(!expanded)}
+                          <button onClick={() => setExpandedStages((prev: Record<string, boolean>) => ({ ...prev, [stageKey]: !prev[stageKey] }))}
                             className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors text-left">
                             <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
                               done ? 'bg-success/10 text-success' : failed ? 'bg-destructive/10 text-destructive' : active ? 'bg-secondary/10 text-secondary' : 'bg-muted text-muted-foreground'
@@ -950,10 +952,10 @@ export default function ResultPage() {
                               {run?.confidence != null && <span className="text-xs text-muted-foreground">{Math.round(run.confidence * 100)}%</span>}
                               {active && <span className="text-xs text-secondary font-semibold animate-pulse">RUNNING</span>}
                               {failed && <span className="text-xs text-destructive font-semibold">FAILED</span>}
-                              <span className="text-xs text-muted-foreground">{expanded ? '▲' : '▼'}</span>
+                              <span className="text-xs text-muted-foreground">{isExpanded ? '▲' : '▼'}</span>
                             </div>
                           </button>
-                          {expanded && logs.length > 0 && (
+                          {isExpanded && logs.length > 0 && (
                             <div className="px-4 pb-3 bg-muted/20 border-t border-border/30">
                               {logs.map((log: any, i: number) => (
                                 <div key={i} className="flex items-start gap-2 py-1.5 text-xs font-mono">
@@ -963,7 +965,7 @@ export default function ResultPage() {
                               ))}
                             </div>
                           )}
-                          {expanded && logs.length === 0 && run?.output && (
+                          {isExpanded && logs.length === 0 && run?.output && (
                             <div className="px-4 pb-3 bg-muted/20 border-t border-border/30">
                               <p className="text-xs text-muted-foreground font-mono">{run.output}</p>
                             </div>

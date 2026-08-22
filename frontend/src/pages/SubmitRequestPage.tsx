@@ -97,7 +97,7 @@ const SubmitRequestPage = () => {
           description: `${created.request_code} is now being processed by the 6-agent AI pipeline.`,
         });
       }
-      navigate(`/agent-tracking/${created.id}`);
+      navigate(`/result/${created.id}`);
     } catch (err: any) {
       toast({ title: 'Submission failed', description: err.message, variant: 'destructive' });
     }
