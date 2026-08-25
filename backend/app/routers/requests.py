@@ -318,21 +318,26 @@ def get_decision_trace(
     else:
         raise HTTPException(403, "Access denied")
 
-    return {
+    # Strip insurer-only fields for hospital users
+    result = {
         "request_id": req.id,
         "request_code": req.request_code,
         "decision": req.decision,
-        "decision_evidence": req.decision_evidence,
-        "decision_trace": req.decision_trace,
         "human_review_requested": req.human_review_requested,
         "human_review_reasons": req.human_review_reasons,
-        "human_reviewer_id": req.human_reviewer_id,
-        "human_review_notes": req.human_review_notes,
-        "human_review_decision": req.human_review_decision,
-        "human_reviewed_at": req.human_reviewed_at,
         "missing_information": req.missing_information,
-        "validation_results": (req.decision_evidence or {}).get("validation_results", []),
     }
+
+    if user.role == "insurer":
+        result["decision_evidence"] = req.decision_evidence
+        result["decision_trace"] = req.decision_trace
+        result["human_reviewer_id"] = req.human_reviewer_id
+        result["human_review_notes"] = req.human_review_notes
+        result["human_review_decision"] = req.human_review_decision
+        result["human_reviewed_at"] = req.human_reviewed_at
+        result["validation_results"] = (req.decision_evidence or {}).get("validation_results", [])
+
+    return result
 
 
 @router.post("/{request_id}/approve-payment", response_model=PARequestOut)

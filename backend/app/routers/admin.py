@@ -1,33 +1,33 @@
 """
 Admin endpoints — insurer verification.
-
-TODO: Add admin-role protection (check user.role == "admin" via get_current_user)
-once admin users are implemented. Currently unauthenticated for demo purposes.
 """
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models.user import User
+from ..security import get_current_user
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 
 @router.post("/verify-insurer/{user_id}")
-def verify_insurer(user_id: int, db: Session = Depends(get_db)):
-    """Mark an insurer account as verified, enabling payment/dispute actions."""
-    # TODO: Protect with admin-role check once admin users exist
-    # user: User = Depends(get_current_user)
-    # if user.role != "admin":
-    #     raise HTTPException(403, "Admin access required")
+def verify_insurer(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Mark an insurer account as verified. Requires authenticated user with hospital admin or insurer role."""
+    if current_user.role != "hospital" or not current_user.can_submit:
+        raise HTTPException(403, "Only hospital administrators can verify insurer accounts")
 
-    user = db.get(User, user_id)
-    if not user:
+    target = db.get(User, user_id)
+    if not target:
         raise HTTPException(404, "User not found")
-    if user.role != "insurer":
+    if target.role != "insurer":
         raise HTTPException(400, "User is not an insurer")
-    if user.is_verified:
+    if target.is_verified:
         return {"message": "Already verified", "user_id": user_id}
 
-    user.is_verified = True
+    target.is_verified = True
     db.commit()
-    return {"message": "Insurer verified", "user_id": user_id, "company_name": user.company_name}
+    return {"message": "Insurer verified", "user_id": user_id, "company_name": target.company_name}

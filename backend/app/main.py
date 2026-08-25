@@ -94,6 +94,9 @@ async def websocket_agent_runs(websocket: WebSocket, token: str = Query(...)):
         if not user:
             await websocket.close(code=1008, reason="User not found")
             return
+        if user.role != "insurer":
+            await websocket.close(code=1008, reason="Agent tracking is restricted to insurer users")
+            return
     finally:
         db_auth.close()
 
