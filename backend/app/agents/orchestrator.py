@@ -34,8 +34,8 @@ import httpx
 from ..models.pa_request import PARequest
 from ..models.agent_run import AgentRun
 
-FAST_MODEL    = "gemini-2.5-flash"
-REASONING_MODEL = "gemini-2.5-flash"
+FAST_MODEL    = "gemini-3.5-flash"
+REASONING_MODEL = "gemini-3.5-flash"
 API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 
 from .policy_rag import retrieve_policy_clauses, build_grounded_context, extract_financial_facts

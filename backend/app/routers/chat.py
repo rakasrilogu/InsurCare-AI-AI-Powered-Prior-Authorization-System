@@ -30,7 +30,7 @@ async def chat(req: ChatRequest, user: User = Depends(get_current_user)):
 
     async with httpx.AsyncClient(timeout=60) as c:
         r = await c.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent",
             params={"key": key},
             json={
                 "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},

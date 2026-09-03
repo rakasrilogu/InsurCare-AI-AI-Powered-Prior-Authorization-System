@@ -517,8 +517,8 @@ def retrieve_policy_clauses(
     # Fuzzy-match insurer name so "Star Health Insurance Ltd." still hits "Star Health"
     insurer_key = _match_insurer(insurer)
 
-    # ── ChromaDB path ───────────────────────────────────────────────────────────
-    if col is not None:
+        # ── ChromaDB path ───────────────────────────────────────────────────────────
+    if col is not None and col.count() > 0:
         query = (
             f"Insurance coverage for {procedure_name}. "
             f"Diagnosis: {diagnosis}. "

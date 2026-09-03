@@ -151,6 +151,7 @@ class RiskEvidence:
     risk_level: str = "moderate"   # low | moderate | elevated | high
     priority: str = "routine"      # routine | expedited | urgent
     risk_factors: list[str] = field(default_factory=list)
+    comorbidities: list[str] = field(default_factory=list)
 
 
 # ── Validation Result ─────────────────────────────────────────────────────────
